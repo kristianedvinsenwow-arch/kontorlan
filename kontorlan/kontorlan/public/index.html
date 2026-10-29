@@ -710,7 +710,7 @@ function effW(i){const b=WEAPONS[i],a=attOf(i);const w=Object.assign({},b,{att:a
   if(a==='iron'){w.scope=false;w.fov=46;w.adsTime=.2}
   if(b.melee){Object.assign(w,MELEE[a]||MELEE['']);w.noAds=true}
   if(a==='laser'){w.laser=true;w.hip=0}
-  if(a==='long'){w.dmg=[110,110];w.range=[30,90];w.rpm=50;w.recoil=.15;w.head=1;w.fov=20;w.scope=true;w.ads=0;w.adsTime=.26;w.speed=.98;w.bigKick=true}
+  if(a==='long'){w.dmg=[110,110];w.range=[30,90];w.rpm=50;w.recoil=.15;w.head=1;w.fov=20;w.scope=true;w.wallbang=true;w.ads=0;w.adsTime=.26;w.speed=.98;w.bigKick=true}
   if(a==='akimbo'){w.akimbo=true;w.noAds=true;w.scope=false;w.mag=b.mag*2;w.hip=b.id==='sniper'?.045:b.id==='revolver'?.03:.04;w.reload*=1.3}
   return w}
 const EFF=WEAPONS.map((w,i)=>effW(i));
@@ -1587,7 +1587,7 @@ function tryFire(forceHand){
     const da=[d.x,d.y,d.z],oa=[o.x,o.y,o.z];
     let wt=rayWorld(oa,da,160);let ht=rayTargets(oa,da,wt,targetsForMe()),wb=false;
     if(ht&&ht.target.boothOn){wt=Math.max(0,ht.t-.4);ht=null;puff(o.clone().addScaledVector(d,wt),0xbfdcef,5,1.4,.35);sTone(2400,.04,.08,'triangle')}
-    if(!ht&&(w.id==='sniper'||ammoSel===4)){const h2=rayTargets(oa,da,160,targetsForMe());if(h2){const th=solidThickness(oa,da,h2.t);if(th>=0&&th<=(w.id==='sniper'?WALLBANG_MAX:1)){ht=h2;wb=true;puff(o.clone().addScaledVector(d,wt),0x8a8a80,6,1.6)}}}
+    if(!ht&&(w.id==='sniper'||w.wallbang||ammoSel===4)){const h2=rayTargets(oa,da,160,targetsForMe());if(h2){const th=solidThickness(oa,da,h2.t);if(th>=0&&th<=(w.id==='sniper'||w.wallbang?WALLBANG_MAX:1)){ht=h2;wb=true;puff(o.clone().addScaledVector(d,wt),0x8a8a80,6,1.6)}}}
     const end=o.clone().addScaledVector(d,ht?ht.t:wt);
     if(p<2&&(P.shots%2===0||w.pellets>1||!w.auto)&&!w.sil)tracer(muzzleW,end);
     if(ht){hitAny=true;const dmg=falloff(w,ht.t)*(ht.head?w.head:1)*(wb?.95:1)*AMMO[ammoSel].mul;puff(end,ht.target.dummy?0x8a7a60:0x9a1a12,4,1.5);if(dealDamage(ht.target,dmg,P.wi,ht.head,wb,P.adsP<.3,ammoSel))killHit=true;const e=sp.get(ht.target)||{d:0,h:false,p:end.clone()};e.d+=dmg;e.h=e.h||ht.head;sp.set(ht.target,e)}
