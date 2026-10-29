@@ -106,6 +106,7 @@ details.controls summary{cursor:pointer;font-size:11px;letter-spacing:.14em;text
 @keyframes pop{0%{opacity:0;transform:scale(1.4)}12%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
 .splat{position:absolute;left:0;top:0;font:800 22px var(--display);color:#fff;text-shadow:0 0 3px #000,0 2px 4px #000;pointer-events:none;white-space:nowrap;will-change:transform}
 .splat.head{color:#ffd23a;font-size:28px}.splat.big{color:var(--red);font-size:30px}
+#fps{position:absolute;left:20px;bottom:4px;font:600 11px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums;letter-spacing:.06em}
 #hp{position:absolute;left:20px;bottom:20px;display:flex;align-items:center;gap:10px;font:800 30px var(--display);font-variant-numeric:tabular-nums}
 #hp .hpbar{width:160px;height:8px;background:rgba(255,255,255,.18)}#hp .hpbar i{display:block;height:100%;background:var(--green);transition:width .15s}
 #hp.low .hpbar i{background:var(--red)}#hp.low{color:var(--red)}#hp.regen .hpbar i{background:var(--amber)}
@@ -163,7 +164,7 @@ details.controls summary{cursor:pointer;font-size:11px;letter-spacing:.14em;text
         <kbd>C</kbd><span>Huk deg (kommer under rør)</span>
         <kbd>R</kbd><span>Lad om</span>
         <kbd>1 / 2 / Q</kbd><span>Primærvåpen / kniv / bytt</span>
-        <kbd>G</kbd><span>Kast BigBite Dagens (1 per liv, +1 ved 3 drap på rad)</span>
+        <kbd>G</kbd><span>Kast BigBite Dagens (fås ved 3 drap på rad)</span>
         <kbd>V eller F</kbd><span>Rask nærkamp</span>
         <kbd>Tab</kbd><span>Poengtavle</span>
         <kbd>Enter</kbd><span>Chat</span>
@@ -184,6 +185,7 @@ details.controls summary{cursor:pointer;font-size:11px;letter-spacing:.14em;text
   <div id="ammo"><div id="wname"></div><div><span id="mag"></span><span id="magMax"></span></div><div id="nades"></div></div>
   <div id="popups"></div>
   <div id="splats"></div>
+  <div id="fps">— FPS</div>
   <div id="hp"><span id="hpNum">100</span><div class="hpbar"><i id="hpBar"></i></div></div>
   <div id="vig"></div>
   <div id="scope" hidden></div>
@@ -245,7 +247,7 @@ const WNAME=i=>i===KNIFE?'Kniv':i===FRAG?'Granat':i===BIGBITE?'BigBite Dagens':(
 /* ---------------- renderer ---------------- */
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;let frameN=0;
 renderer.outputEncoding=THREE.sRGBEncoding;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
 renderer.physicallyCorrectLights=false;
 renderer.autoClear=false;
@@ -316,6 +318,19 @@ function applyHD(k){const h=hdTex[k];
 function mat(color,tex,o={}){const k=color+'|'+(tex||'')+'|'+JSON.stringify(o);if(!matCache[k]){const T=tex?TEX[tex]:null;queueMicrotask(()=>{const m=matCache[k];if(m){m.userData.tex=tex;if(tex&&hdTex[tex])setHD(m,hdTex[tex])}});
   matCache[k]=new THREE.MeshStandardMaterial({color:lin(color),map:T,bumpMap:T,bumpScale:tex?BUMP[tex]:0,roughness:o.r!=null?o.r:(tex?ROUGH[tex]:.8),metalness:o.m!=null?o.m:(tex&&METAL[tex]||0)})}return matCache[k]}
 function boxGeo(w,h,d,tile=2){const g=new THREE.BoxGeometry(w,h,d);const uv=g.attributes.uv;const dims=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];for(let f=0;f<6;f++)for(let i=0;i<4;i++){const k=f*4+i;uv.setXY(k,uv.getX(k)*dims[f][0]/tile,uv.getY(k)*dims[f][1]/tile)}uv.needsUpdate=true;return g}
+
+/* ---------------- draw-call merging ----------------
+   Meshes that share a material and a parent are baked into one mesh. Moving parts live in their own
+   child groups (legs, arms, bolt, pump), so they stay separate and keep animating. */
+function mergeGeos(geos){let n=0;for(const g of geos)n+=g.attributes.position.count;const out=new THREE.BufferGeometry();
+  for(const[name,size]of[['position',3],['normal',3],['uv',2]]){if(!geos.every(g=>g.attributes[name]))continue;const arr=new Float32Array(n*size);let o=0;for(const g of geos){arr.set(g.attributes[name].array,o);o+=g.attributes.position.count*size}out.setAttribute(name,new THREE.BufferAttribute(arr,size))}
+  geos.forEach(g=>g.dispose());out.computeBoundingSphere();out.computeBoundingBox();return out}
+function mergeChildren(parent){const groups=new Map();
+  for(const c of parent.children){if(!c.isMesh||c.children.length||Array.isArray(c.material)||c.userData.keep)continue;let l=groups.get(c.material);if(!l)groups.set(c.material,l=[]);l.push(c)}
+  for(const[m,list]of groups){if(list.length<2)continue;const geos=[];let cast=false,recv=false;
+    for(const c of list){c.updateMatrix();const g=c.geometry.index?c.geometry.toNonIndexed():c.geometry.clone();g.applyMatrix4(c.matrix);geos.push(g);cast=cast||c.castShadow;recv=recv||c.receiveShadow;parent.remove(c);c.geometry.dispose()}
+    const mm=new THREE.Mesh(mergeGeos(geos),m);mm.castShadow=cast;mm.receiveShadow=recv;parent.add(mm)}}
+function mergeDeep(o){for(const c of o.children.slice())if(!c.isMesh&&!c.isSprite)mergeDeep(c);mergeChildren(o);return o}
 
 /* ---------------- maps ---------------- */
 let boxes=[],curMap=null;
@@ -403,6 +418,7 @@ for(const k in MAPS){const M=MAPS[k];BG=new THREE.Group();BX=[];M.build();
   const gm=new THREE.Mesh(new THREE.PlaneGeometry(M.half*2+6,M.half*2+6),mat(M.ground,M.groundTex));
   gm.material=gm.material.clone();gm.material.map=TEX[M.groundTex].clone();gm.material.map.needsUpdate=true;gm.material.map.repeat.set((M.half*2+6)/7,(M.half*2+6)/7);gm.material.bumpMap=gm.material.map;M.groundMat=gm.material;
   gm.rotation.x=-Math.PI/2;gm.receiveShadow=true;BG.add(gm);
+  mergeChildren(BG);BG.traverse(o=>{o.updateMatrix();o.matrixAutoUpdate=false});
   M.group=BG;M.boxes=BX;BG.visible=false;scene.add(BG);M.env=makeEnv(M.sky[0],M.sky[1],M.sky[2],M.sunPos);
   // footprint for minimap / thumbnail
   const S=256,c=document.createElement('canvas');c.width=c.height=S;const g=c.getContext('2d');const span=M.half+1.5,sc=S/(span*2);
@@ -620,7 +636,6 @@ function gunModel(id,camo=0,att=''){
     const rcv=cz(g,.034,.22,met,0,.006,-.03,24);rcv.scale.set(.82,1,1);
     const top=cz(g,.022,.2,met,0,.03,-.03,20);top.scale.set(.95,1,.6);
     bx(g,.002,.032,.08,blk,.028,.012,-.035);cz(g,.009,.012,steel,.03,-.01,.05,10).rotation.set(0,0,Math.PI/2);
-    const hm=new THREE.Group();hm.position.set(0,.03,.075);g.add(hm);bx(hm,.008,.034,.012,steel,0,.012,0,-.5);ball(hm,v3(0,.03,.012),.008,steel,10);
     const tg=mesh(new THREE.TorusGeometry(.024,.0035,8,20,Math.PI),met,g);tg.rotation.set(0,Math.PI/2,Math.PI);tg.position.set(0,-.03,.04);bx(g,.004,.022,.004,steel,0,-.032,.035);
     cz(g,.017,.62,blued,0,.03,-.45,24);cz(g,.0185,.025,blued,0,.03,-.755,24);
     const tl=att==='ext'?.56:.48;cz(g,.0145,tl,blued,0,-.012,-.15-tl/2,20);cz(g,.016,.025,steel,0,-.012,-.15-tl,20);cz(g,.02,.018,met,0,.009,-.66,20).scale.set(1,1.6,1);
@@ -667,6 +682,7 @@ function gunModel(id,camo=0,att=''){
     bx(g,.005,.02,.05,met,0,-.02,-.03);cz(g,.007,.012,steel,0,.032,-.158,10);bx(g,.006,.01,.008,met,0,.055,-.14);bx(g,.02,.01,.008,met,0,.055,.025);
     tip=-.17;if(att==='sil'){cz(g,.016,.13,met,0,.032,-.23,18);tip=-.3}
     sightY=.06;support=[-.02,-.07,.04]}
+  mergeDeep(g);
   return{g,tip,support,sightY,bolt,pump,adsZ:g.userData.adsZ||-.3};
 }
 function boltPose(bolt,k){if(!bolt)return;
@@ -708,7 +724,7 @@ function makeSub(){const g=new THREE.Group();
   g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),120,.0022,6),sauce));
   const pts2=[];for(let i=0;i<=40;i++){const t=i/40;pts2.push(v3(.012+Math.sin(t*Math.PI*7+1)*.012,.032,-L/2-r*.2+t*(L+r*.4)))}
   g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts2),120,.0018,6),mat(0xf2c21e,null,{r:.3})));
-  g.traverse(o=>{if(o.isMesh)o.castShadow=true});return g}
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true});return mergeDeep(g)}
 
 /* ---------------- soldier model ---------------- */
 function nameSprite(text,color){const c=document.createElement('canvas');c.width=256;c.height=64;const g=c.getContext('2d');g.font='700 34px "Saira Condensed", Arial Narrow, sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineWidth=6;g.strokeStyle='rgba(0,0,0,.8)';g.strokeText(text,128,32);g.fillStyle=color;g.fillText(text,128,32);
@@ -746,7 +762,7 @@ function makeSoldier(ci,name){
   const guns=WEAPONS.map(w=>{const m=gunModel(w.id);m.g.position.set(.07,-.03,-.36);m.g.visible=false;arms.add(m.g);m.key=0;return m});
   const sub=makeSub();sub.scale.setScalar(1.4);sub.position.set(.08,-.1,-.32);sub.rotation.set(0,.4,0);sub.visible=false;arms.add(sub);
   const tag=nameSprite(name,col);g.add(tag);
-  scene.add(g);return{g,legs,upper,arms,head,guns,sub,tag,name,ci};
+  mergeDeep(g);scene.add(g);return{g,legs,upper,arms,head,guns,sub,tag,name,ci};
 }
 function disposeSoldier(s){scene.remove(s.g);s.g.traverse(o=>{if(o.geometry)o.geometry.dispose()});s.tag.material.map.dispose();s.tag.material.dispose()}
 function animSoldier(s,e,dt){s.g.position.copy(e.pos);s.g.rotation.y=e.yaw;const pit=clamp(e.pitch,-1.2,1.2);s.arms.rotation.x=pit;s.head.rotation.x=pit*.6;
@@ -773,14 +789,14 @@ function noShadow(g){g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveSha
 function buildGun(i){const id=WEAPONS[i].id,camo=camoSel[i],att=attOf(i);
   if(att==='akimbo'){const c=new THREE.Group();const A=gunModel(id,camo,att),B=gunModel(id,camo,att);A.g.position.x=.19;B.g.position.x=-.19;B.g.scale.x=-1;c.add(A.g,B.g);
     for(const m of[A,B])armTo(m.g,v3(.13,-.24,.5),gripOf(id),1);
-    noShadow(c);c.visible=false;vmRoot.add(c);return{g:c,tip:A.tip,sightY:A.sightY,adsZ:-.3,bolts:[A.bolt,B.bolt],parts:[A.g,B.g],akimbo:true}}
+    for(const m of[A,B])mergeDeep(m.g);noShadow(c);c.visible=false;vmRoot.add(c);return{g:c,tip:A.tip,sightY:A.sightY,adsZ:-.3,bolts:[A.bolt,B.bolt],parts:[A.g,B.g],akimbo:true}}
   const m=gunModel(id,camo,att);const g=m.g;
   armTo(g,v3(.13,-.24,.5),gripOf(id),1);
-  if(!m.support){noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[];return m}
+  if(!m.support){mergeDeep(g);noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[];return m}
   const sp=v3(...m.support);const host=m.pump||g;
   limb(host,v3(-.24,-.26,.18),sp.clone().add(v3(-.03,-.03,.08)),.055,.045,sleeveM,14);limb(host,sp.clone().add(v3(-.035,-.035,.1)),sp.clone().add(v3(-.025,-.025,.06)),.05,.05,cuffM,14);
   const lh=ball(host,sp,.036,gloveM,14);lh.scale.set(1.2,1,1.4);
-  noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[m.bolt];return m}
+  mergeDeep(g);noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[m.bolt];return m}
 const GUNS=WEAPONS.map((w,i)=>buildGun(i));
 const akMag=i=>EFF[i].akimbo?[EFF[i].mag/2,EFF[i].mag/2]:null;
 function rebuildGun(i){const old=GUNS[i];vmRoot.remove(old.g);old.g.traverse(o=>{if(o.geometry)o.geometry.dispose()});EFF[i]=effW(i);GUNS[i]=buildGun(i);if(P.ammoH){P.ammoH[i]=akMag(i);if(P.ammoH[i]&&P.ammo)P.ammo[i]=EFF[i].mag}
@@ -942,6 +958,7 @@ function explode(n){const p=n.pos;explosionFx(p,n.big);const dm=cam.position.dis
   const RAD=n.big?11:6.5,BASE=n.big?260:170;const from=p.clone();from.y+=.25;
   const dmgAt=(t)=>{const c=t.pos.clone();c.y+=.9;const d=c.distanceTo(p);if(d>RAD||!los(from,c))return 0;return BASE*Math.pow(1-d/RAD,1.1)};
   if(P.alive&&!matchOver){const d=dmgAt(P);if(d>0)hurtMe(d,n.owner,n.big?BIGBITE:FRAG,false)}
+  if(n.owner&&n.owner.me){let any=false,kill=false;for(const t of targetsForMe()){if(!t.alive)continue;const d=dmgAt(t);if(d<=0)continue;any=true;const c=t.pos.clone();c.y+=1.2;splat(c,d,false);if(t.dummy)t.hitAt=now;else if(t.hpGuess!=null&&t.hpGuess-d<=0)kill=true}if(any)hitmarker(kill)}
   if(dm<10)shake=Math.max(shake,.6*(1-dm/10))}
 let shake=0;
 
@@ -956,11 +973,11 @@ function onMyKill(vName,head,wb,wi){P.kills++;P.streak++;popup(head?'Headshot':'
   if(wi>=0&&wi<5){wk[wi]++;store.set('wk',wk);const A=ATT[WEAPONS[wi].id].find(a=>a.need===wk[wi]);if(A&&!camoAll){popup(A.name+' låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+A.name+' til '+WEAPONS[wi].name+'. Utstyr det i menyen (Esc).',true)}}
   if(wi>=0&&wi<5&&WEAPONS[wi].melee){const u=CAMOS.find(c=>c.need===wk[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · Kniv',true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til kniven. Utstyr den i menyen (Esc).',true)}}
   if(head&&wi>=0&&wi<5&&!WEAPONS[wi].melee){hs[wi]++;store.set('hs',hs);const u=CAMOS.find(c=>c.need===hs[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til '+WEAPONS[wi].name+'. Utstyr den i menyen (Esc).',true)}}
-  if(P.streak===3){P.bigbite++;popup('Ekstra BigBite Dagens · trykk G',true);sTone(660,.15,.2,'sine');setTimeout(()=>sTone(990,.2,.2,'sine'),160)}
+  if(P.streak===3){P.bigbite++;popup('BigBite Dagens klar · trykk G',true);sTone(660,.15,.2,'sine');setTimeout(()=>sTone(990,.2,.2,'sine'),160)}
   else if(P.streak===5)popup('5 drap på rad',true);else if(P.streak===10)popup('10 drap på rad · urørlig',true);else if(P.streak%5===0)popup(P.streak+' drap på rad',true);
   sendPresence(true)}
 function tryRespawn(){if(P.alive||now-P.deadAt<1.8||matchOver)return;respawn()}
-function respawn(){const s=pickSpawn();P.pos.set(s[0],0,s[1]);P.vel.set(0,0,0);P.yaw=Math.atan2(s[0],s[1])+rand(-.5,.5);P.pitch=0;P.hp=100;P.alive=true;P.bigbite=Math.max(P.bigbite,1);
+function respawn(){const s=pickSpawn();P.pos.set(s[0],0,s[1]);P.vel.set(0,0,0);P.yaw=Math.atan2(s[0],s[1])+rand(-.5,.5);P.pitch=0;P.hp=100;P.alive=true;
   P.ammo=EFF.map(w=>w.mag);P.ammoH=EFF.map((w,i)=>akMag(i));P.wi=P.primary;P.reloadT=0;P.fireT=0;P.boltAt=0;P.holdSub=false;P.handT=[0,0];P.knockT=0;P.spawnT=now;P.crouch=false;P.h=H_STAND;P.adsP=0;P.switchT=now+.3;$('death').hidden=true;sendPresence(true)}
 function pickSpawn(){const foes=[...remotes.values()].filter(t=>t.alive);
   let best=null,bs=-1e9;for(const s of curMap.spawns){let md=60;const sp=new V3(s[0],1.5,s[1]);
@@ -1091,7 +1108,7 @@ function renderScore(){const rows=roster();const lead=rows[0];const sc=$('score'
   line('Deg',P.kills,false);if(lead&&!lead.me)line('Leder',lead.k,true);else if(rows[1])line('2.',rows[1].k,true)}
 function updateHUD(dt){const w=EFF[P.wi];
   if(false){}else{if(w.melee){$('mag').textContent='—';$('magMax').textContent='';$('wname').textContent=w.name+' · rekkevidde '+w.reach.toFixed(1).replace('.',',')+' m'}else{$('mag').textContent=w.akimbo&&P.ammoH&&P.ammoH[P.wi]?P.ammoH[P.wi][1]+' | '+P.ammoH[P.wi][0]:P.ammo[P.wi]??0;$('magMax').textContent='/'+(w.akimbo?w.mag/2:w.mag);$('wname').textContent=w.name+(w.att?' · '+ATT[w.id][attSel[P.wi]].name:'')}}
-  $('nades').textContent='BigBite Dagens × '+P.bigbite+' [G]';
+  $('nades').textContent=P.bigbite?'BigBite Dagens × '+P.bigbite+' [G]':'';
   $('reload').hidden=!(P.reloadT>0&&P.alive);
   const moving=Math.hypot(P.vel.x,P.vel.z)>1;const spread=lerp(w.hip,w.ads,P.adsP)*(moving?1.4:1)*(P.onGround?1:2);const gap=6+spread*420;
   const cr=$('cross');cr.style.opacity=P.alive&&!P.sprint&&P.adsP<.6&&!P.holdSub?1:0;const ch=cr.children;
@@ -1104,8 +1121,9 @@ function updateHUD(dt){const w=EFF[P.wi];
   if(!$('board').hidden&&((now*4)|0)!==((now-dt)*4|0))renderBoard();
   if(((now*3)|0)!==((now-dt)*3|0))renderScore();
   const nb=$('netBadge');nb.textContent=netState==='online'?'● Tilkoblet · '+(remotes.size+1)+' på '+curMap.name:'○ Kobler til på nytt…';
-  drawMini();
+  if(((now*30)|0)!==((now-dt)*30|0))drawMini();
   // name tag on aimed target
+  if(((now*15)|0)===((now-dt)*15|0))return;
   camBasis();const o=[cam.position.x,cam.position.y,cam.position.z],d=[_f.x,_f.y,_f.z];const wt=rayWorld(o,d,80);const ht=rayTargets(o,d,wt,targetsForMe());
   for(const t of targetsForMe())if(t.mesh){let v=!!(ht&&ht.target===t);if(v){const hp=t.pos.clone();hp.y+=1.7;v=los(cam.position,hp)}t.mesh.tag.visible=v}
 }
@@ -1240,17 +1258,19 @@ function updateView(dt){const w=EFF[P.wi];
   if(subVM.visible){const ta=now-P.subAt;const k=ta>0&&ta<.26?Math.sin(ta/.26*Math.PI):0;const raise=now<P.switchT?(P.switchT-now)/.3:0;subVM.position.set(.2-k*.1,-.2-raise*.2+k*.08+Math.abs(Math.cos(walkPh))*.01*bob,-.46-k*.25);subVM.rotation.set(-.15-k*.6,.15,.1)}
   muzzle.visible=now<muzzleT&&P.alive&&!P.holdSub;if(muzzle.visible){const mx=G.akimbo?(P.lastHand?-.19:.19):0;muzzle.position.set(x+mx,y+.01,z+G.tip);muzzle.rotation.z=Math.random()*3;muzzle.scale.setScalar(rand(.8,1.3))}
 }
+let fpsF=0,fpsShow=0;function fpsTick(){fpsF++;const el=now-fpsShow;if(el>=.5){$('fps').textContent=Math.round(fpsF/el)+' FPS';fpsF=0;fpsShow=now}}
 let last=0,orbit=0,fpsAcc=0,fpsN=0,fpsT=0,pr=Math.min(window.devicePixelRatio||1,2);const PR_MAX=pr;
 function autoRes(dt){fpsAcc+=dt;fpsN++;if(now-fpsT<2)return;const fps=fpsN/fpsAcc;fpsAcc=0;fpsN=0;fpsT=now;let n=pr;if(fps<45&&pr>.75)n=Math.max(.75,pr-.25);else if(fps>58&&pr<PR_MAX)n=Math.min(PR_MAX,pr+.25);if(n!==pr){pr=n;renderer.setPixelRatio(pr);resize()}}
 function frame(t){requestAnimationFrame(frame);const dt=Math.min(.05,(t-last)/1000||0);last=t;now=t/1000;autoRes(dt);GLIT.value=now;
   if(state==='menu'){orbit+=dt*.06;if(!curMap)setMap('refinery');const r=curMap.half*1.25;cam.fov=60;cam.updateProjectionMatrix();cam.position.set(Math.sin(orbit)*r,curMap.half*.55,Math.cos(orbit)*r);cam.rotation.set(0,0,0);cam.lookAt(0,1.5,0);
     if(((now*2)|0)!==((now-dt)*2|0))renderCounts();
-    renderer.clear();renderer.render(scene,cam);return}
+    if((++frameN&3)===0)renderer.shadowMap.needsUpdate=true;renderer.clear();renderer.render(scene,cam);return}
   if(P.alive&&!matchOver&&locked())updatePlayer(dt);
   else if(P.alive){P.vel.x*=.8;P.vel.z*=.8;let rem=dt;while(rem>0){const s=Math.min(rem,1/120);moveEntity(P,s);rem-=s}P.speed=0;P.adsP=approach(P.adsP,0,dt*5)}
   updateRemotes(dt);updateDummy();updateSplats();
   updateNades(dt);updateFx(dt);updateView(dt);updateHUD(dt);checkMatch();
-  renderer.clear();renderer.render(scene,cam);renderer.clearDepth();renderer.render(vmScene,vmCam)}
+  if((++frameN&1)===0)renderer.shadowMap.needsUpdate=true;
+  renderer.clear();renderer.render(scene,cam);renderer.clearDepth();renderer.render(vmScene,vmCam);fpsTick(dt)}
 
 buildMenu();setMap('refinery');initNet();loadHD();requestAnimationFrame(frame);
 })();
