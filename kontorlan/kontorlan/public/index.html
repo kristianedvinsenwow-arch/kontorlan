@@ -224,11 +224,12 @@ label.chk{display:flex;align-items:center;gap:8px;text-transform:none;letter-spa
         <kbd>4</kbd><span>Killstreak for 5 drap på rad (velges i menyen)</span>
         <kbd>5</kbd><span>Killstreak for 7 drap på rad (velges i menyen)</span>
         <kbd>6</kbd><span>Atombombe (25 drap på rad) · avslutter runden</span>
+        <kbd>I</kbd><span>Inspiser våpenet</span>
         <kbd>E</kbd><span>Plant / desarmer bomben (Lageret)</span>
         <kbd>Tab</kbd><span>Poengtavle</span>
         <kbd>Enter</kbd><span>Chat</span>
         <kbd>Esc</kbd><span>Meny</span>
-        <kbd>Kontroller</kbd><span>Venstre stikke gå · høyre stikke sikt · RT skyt · LT sikt (akimbo: venstre våpen) · A hopp (hold for å hoppe igjen) · R3 huk · X lad om (hold: plant/desarmer) · Y bytt våpen · LB/RB/opp killstreak 3/5/7 · ned atombombe · L3 løp · Start meny · Back poengtavle</span>
+        <kbd>Kontroller</kbd><span>Venstre stikke gå · høyre stikke sikt · RT skyt · LT sikt (akimbo: venstre våpen) · A hopp (hold for å hoppe igjen) · R3 huk · X lad om (hold: plant/desarmer) · Y bytt våpen · LB/RB/opp killstreak 3/5/7 · ned atombombe · høyre inspiser · L3 løp · Start meny · Back poengtavle</span>
       </div>
     </details>
   </div>
@@ -2025,7 +2026,7 @@ function pollPad(dt){let gp=null;try{const l=navigator.getGamepads?navigator.get
   if(pressed(11)&&P.alive){if(P.crouch)tryStand();else P.crouch=true}
   if(pressed(2))startReload();if(down[2]){keys.KeyE=true;padE=true}else if(padE){keys.KeyE=false;padE=false}
   if(pressed(3)&&!ggOn())switchTo(P.wi===4?P.primary:4);
-  if(pressed(4))useStreak(3);if(pressed(5))useStreak(5);if(pressed(12))useStreak(7);if(pressed(13))useNuke()}
+  if(pressed(4))useStreak(3);if(pressed(5))useStreak(5);if(pressed(12))useStreak(7);if(pressed(13))useNuke();if(pressed(15))startInspect()}
 window.addEventListener('gamepadconnected',()=>{padLast=now;toast('Kontroller tilkoblet · Start åpner menyen')});
 let chatOpen=false;
 function openChat(){chatOpen=true;for(const k in keys)keys[k]=false;mouseDown=rmb=false;const i=$('chatIn');i.hidden=false;i.value='';$('chat').classList.add('open');setTimeout(()=>i.focus(),0)}
@@ -2056,6 +2057,7 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit4')useStreak(5);
   if(e.code==='Digit5')useStreak(7);
   if(e.code==='Digit6')useNuke();
+  if(e.code==='KeyI')startInspect();
 });
 addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Tab')$('board').hidden=true});
 function ladderAt(){const L=curMap&&curMap.ladders;if(!L||!L.length||!P.alive)return null;
@@ -2071,7 +2073,28 @@ const _f=new V3(),_r=new V3(),_u=new V3();
 function camBasis(){cam.getWorldDirection(_f);_r.set(1,0,0).applyQuaternion(cam.quaternion);_u.set(0,1,0).applyQuaternion(cam.quaternion)}
 function targetsForMe(){const sd=teamOn()&&myTeam>=0;const l=[...remotes.values()].filter(r=>!r.sp&&!(sd&&r.tm===myTeam));if(dummy)l.push(dummy);return l}
 function falloff(w,d){const t=clamp((d-w.range[0])/(w.range[1]-w.range[0]),0,1);return lerp(w.dmg[0],w.dmg[1],t)}
-function tryFire(forceHand){
+/* ---------------- weapon inspect (I / D-pad right) ----------------
+   Keyframes are offsets added to the normal hip pose: [time, dx, dy, dz, rx, ry, rz]. Some weapons add extras
+   (revolver spin, knife twirl, pump/bolt cycling). Firing, aiming, reloading, sprinting or switching cancels it. */
+const INSPECT={
+  gun:{T:3.0,k:[[0,0,0,0,0,0,0],[.45,-.12,.05,.06,.15,.9,.55],[1.3,-.13,.06,.05,.2,1.0,.6],[1.75,-.08,.04,.06,-.1,-.6,-.9],[2.4,-.08,.05,.05,-.15,-.7,-1.0],[3.0,0,0,0,0,0,0]]},
+  shotgun:{T:3.2,k:[[0,0,0,0,0,0,0],[.45,-.12,.05,.06,.12,.95,.5],[1.3,-.13,.06,.05,.18,1.05,.55],[1.75,-.08,.04,.06,-.05,-.5,-.8],[2.6,-.08,.05,.05,-.1,-.6,-.85],[3.2,0,0,0,0,0,0]],pump:[2.0,2.5]},
+  sniper:{T:3.6,k:[[0,0,0,0,0,0,0],[.5,-.1,.06,.07,.1,.85,.45],[1.4,-.11,.07,.06,.16,.95,.5],[1.8,-.04,.02,.05,0,-.35,-.55],[3.0,-.04,.03,.05,-.05,-.4,-.6],[3.6,0,0,0,0,0,0]],bolt:[2.0]},
+  dbl:{T:3.0,k:[[0,0,0,0,0,0,0],[.4,-.1,.03,.07,-.35,.6,.35],[1.2,-.11,.04,.06,-.3,.7,.4],[1.7,-.06,.06,.05,.25,-.55,-.7],[2.4,-.06,.06,.05,.2,-.6,-.75],[3.0,0,0,0,0,0,0]]},
+  fifty:{T:3.8,k:[[0,0,0,0,0,0,0],[.8,-.08,.03,.05,.08,.6,.35],[1.8,-.09,.04,.05,.1,.65,.4],[2.2,-.06,-.04,.04,-.12,.4,.25],[2.35,-.06,-.02,.04,-.08,.4,.25],[2.5,-.06,-.045,.04,-.12,.4,.25],[3.0,-.04,0,.04,-.05,-.3,-.4],[3.8,0,0,0,0,0,0]]},
+  revolver:{T:3.4,k:[[0,0,0,0,0,0,0],[.15,-.03,.04,.0,0,0,0],[1.0,-.05,.05,.0,0,0,0],[1.35,-.11,.06,.08,.1,.9,.5],[2.2,-.12,.07,.07,.15,1.0,.55],[2.6,-.07,.05,.07,-.1,-.6,-.8],[3.0,-.07,.05,.06,-.12,-.65,-.85],[3.4,0,0,0,0,0,0]],spin:[.12,1.0,2],cyl:[1.6,2.4]},
+  knife:{T:2.7,k:[[0,0,0,0,0,0,0],[.2,-.05,.05,0,0,0,0],[.95,-.06,.06,0,0,0,0],[1.3,-.1,.08,.06,.1,1.1,1.3],[2.1,-.1,.09,.06,.15,1.2,1.4],[2.7,0,0,0,0,0,0]],twirl:[.15,.95]}};
+const inspKind=w=>w.melee?'knife':w.id==='revolver'?'revolver':w.id==='shotgun'?'shotgun':w.id==='sniper'?'sniper':w.id==='dbl'?'dbl':w.id==='fifty'?'fifty':'gun';
+function startInspect(){if(!P.alive||P.holdSub||P.rkHold||P.reloadT>0||P.adsP>.1||now<P.switchT||P.spect||P.inspectAt>0&&now-P.inspectAt<INSPECT[P.inspectKind].T)return;
+  P.inspectKind=inspKind(EFF[P.wi]);P.inspectAt=now;sNoise(1400,.06,.12,'bandpass',2)}
+function inspectPose(){if(!(P.inspectAt>0))return null;const I=INSPECT[P.inspectKind];const t=now-P.inspectAt;
+  if(t>=I.T||!P.alive||mouseDown||rmb||P.reloadT>0||P.sprint||now<P.switchT||P.holdSub||P.rkHold){P.inspectAt=-9;return null}
+  const K=I.k;let i=0;while(i<K.length-2&&t>K[i+1][0])i++;const a=K[i],b=K[i+1],u=clamp((t-a[0])/(b[0]-a[0]),0,1),e=u*u*(3-2*u);
+  const o=a.map((v,j)=>v+(b[j]-v)*e);o[0]=t;
+  if(I.spin){const[s0,s1,n]=I.spin,q=clamp((t-s0)/(s1-s0),0,1);o[4]+=-(q*q*(3-2*q))*n*TAU}         // western spin around the trigger finger
+  if(I.twirl){const[s0,s1]=I.twirl,q=clamp((t-s0)/(s1-s0),0,1);o[5]+=(q*q*(3-2*q))*TAU*2}
+  return{o,t,I}}
+function tryFire(forceHand){if(P.inspectAt>0)P.inspectAt=-9;
   if(inBooth()){if(firePressed||firePressed2){firePressed=firePressed2=false;leaveBooth()}return}
   if(sdNoCombat()){firePressed=firePressed2=false;return}
   if(P.holdSub)return;
@@ -2547,6 +2570,12 @@ function updateView(dt){const w=EFF[P.wi];
     g.rotation.order='ZYX';
     g.position.set(A[0]+sb,A[1]-sp*.04+Math.abs(Math.cos(walkPh))*.012*bob-(now<P.switchT?(P.switchT-now)/.35*.3:0),A[2]);
     g.rotation.set(A[3]-sp*.25,A[4],A[5])}else g.rotation.order='XYZ';
+  {const ip=inspectPose();if(ip){const o=ip.o,t=ip.t,I=ip.I;
+    if(G.akimbo&&G.parts&&I.spin){g.position.x+=o[1]*.3;g.position.y+=o[2];g.position.z+=o[3];for(const pt of G.parts)pt.rotation.x=o[4];g.rotation.y+=o[5]*.25;g.rotation.z+=o[6]*.25}
+    else{g.position.x+=o[1];g.position.y+=o[2];g.position.z+=o[3];g.rotation.x+=o[4];g.rotation.y+=o[5];g.rotation.z+=o[6]}
+    if(I.pump&&G.pump){const k=(t-I.pump[0])/(I.pump[1]-I.pump[0]);pumpPose(G.pump,k*.5);if(Math.abs(t-I.pump[0]-.05)<.02)sNoise(1600,.06,.18,'bandpass',2)}
+    if(I.bolt&&G.bolts){const k=(t-I.bolt[0])/1.0;G.bolts.forEach(b=>boltPose(b,k));if(Math.abs(t-I.bolt[0]-.05)<.02)sNoise(2600,.05,.16,'bandpass',3)}
+    if(I.cyl){if(t>I.cyl[0]&&t<I.cyl[1]){if(G.cyl)G.cyl.rotation.z+=.6;if(G.cyls)G.cyls.forEach(c=>{if(c)c.rotation.z+=.6})}}}}
   if(subVM.visible){const ta=now-P.subAt;const k=ta>0&&ta<.26?Math.sin(ta/.26*Math.PI):0;const raise=now<P.switchT?(P.switchT-now)/.3:0;subVM.position.set(.2-k*.1,-.2-raise*.2+k*.08+Math.abs(Math.cos(walkPh))*.01*bob,-.46-k*.25);subVM.rotation.set(-.15-k*.6,.15,.1)}
   if(myBooth||inBooth()){if(!myBooth)myBooth=makeBooth();animBooth(myBooth,inBooth()&&P.alive,P.pos,P.boothYaw,dt)}
   updateLaser(w);
