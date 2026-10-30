@@ -426,8 +426,8 @@ function solid(x,y,z,w,h,d,color,tex='metal',o={}){
 function crate(x,y,z,s=1.25){return solid(x,y,z,s,s,s,0xb08654,'crate',{tile:s})}
 function barrel(x,z,color){const m=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,1.1,28),mat(color,'metal'));m.position.set(x,.55,z);m.castShadow=m.receiveShadow=true;BG.add(m);BX.push({t:'c',x,z,r:.42,mn:[x-.42,0,z-.42],mx:[x+.42,1.1,z+.42],h:1.1})}
 function tank(x,z,r,h,color){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,48),mat(color,'metal'));m.position.set(x,h/2,z);m.castShadow=m.receiveShadow=true;BG.add(m);
-  const cap=new THREE.Mesh(new THREE.CylinderGeometry(r*.8,r,0.6,48),mat(color,'metal'));cap.position.set(x,h+.3,z);cap.castShadow=true;BG.add(cap);
-  BX.push({t:'c',x,z,r,mn:[x-r,0,z-r],mx:[x+r,h,z+r],h});BX.push({t:'c',x,z,r:r*.8,mn:[x-r*.8,h,z-r*.8],mx:[x+r*.8,h+.6,z+r*.8],h:h+.6})}
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(r*.8,r,0.5,48),mat(color,'metal'));cap.position.set(x,h+.25,z);cap.castShadow=true;BG.add(cap);
+  BX.push({t:'c',x,z,r,mn:[x-r,0,z-r],mx:[x+r,h,z+r],h});BX.push({t:'c',x,z,r:r*.8,mn:[x-r*.8,h,z-r*.8],mx:[x+r*.8,h+.5,z+r*.8],h:h+.5})}
 function pipe(ax,a0,a1,c,yc,r,color){const len=a1-a0,mid=(a0+a1)/2;const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,len,28),mat(color,'metal'));m.castShadow=m.receiveShadow=true;
   if(ax==='x'){m.rotation.z=Math.PI/2;m.position.set(mid,yc,c);BX.push({t:'p',ax:0,ca:yc,cb:c,r,lo:a0,hi:a1,mn:[a0,yc-r,c-r],mx:[a1,yc+r,c+r],h:yc+r})}
   else{m.rotation.x=Math.PI/2;m.position.set(c,yc,mid);BX.push({t:'p',ax:2,ca:c,cb:yc,r,lo:a0,hi:a1,mn:[c-r,yc-r,a0],mx:[c+r,yc+r,a1],h:yc+r})}
@@ -448,6 +448,16 @@ function siteMark(x,z,letter,r){const c=document.createElement('canvas');c.width
   const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=8;
   const m=new THREE.Mesh(new THREE.PlaneGeometry(r*2,r*2),new THREE.MeshStandardMaterial({map:t,transparent:true,depthWrite:false,roughness:.9,polygonOffset:true,polygonOffsetFactor:-2}));
   m.rotation.x=-Math.PI/2;m.position.set(x,.02,z);m.receiveShadow=true;m.userData.keep=true;BG.add(m)}
+/* climbable ladder: (x,z) foot of the ladder, (nx,nz) direction the climber stands in, y0..y1 height,
+   (ex,ez) the way you step off at the top. Rails and rungs don't collide; the climbing zone is stored on the map. */
+var LADS=[];
+function ladder(x,z,nx,nz,y0,y1,ex,ez,cage){const lx=-nz,lz=nx,ry=Math.atan2(nx,nz),m=mat(0x8a8f94,'gunmetal',{r:.4,m:.8});
+  const put=(geo,l,o,y,rx=0)=>{const o2=new THREE.Mesh(geo,m);o2.position.set(x+lx*l+nx*o,y,z+lz*l+nz*o);o2.rotation.set(rx,ry,0,'YXZ');o2.castShadow=true;BG.add(o2);return o2};
+  const H=y1-y0+1;for(const l of[-.26,.26])put(new THREE.BoxGeometry(.05,H,.05),l,0,y0+H/2);
+  for(let y=y0+.3;y<y1+.05;y+=.3)put(new THREE.BoxGeometry(.52,.035,.035),0,0,y);
+  if(cage)for(let y=y0+2.3;y<=y1+.8;y+=.75){// safety hoops arching out from the ladder
+    const g=new THREE.Group();g.position.set(x,y,z);g.rotation.y=ry;const tt=new THREE.Mesh(new THREE.TorusGeometry(.38,.018,6,18,Math.PI),m);tt.rotation.x=Math.PI/2;g.add(tt);g.updateMatrixWorld(true);tt.applyMatrix4(g.matrixWorld);tt.castShadow=true;BG.add(tt)}
+  LADS.push({x,z,nx,nz,lx,lz,y0,y1,ex,ez})}
 /* glass spectator cage high above the map */
 const CAGE_GLASS=new THREE.MeshStandardMaterial({color:lin(0xcfe6f2),roughness:.05,metalness:.1,transparent:true,opacity:.18,depthWrite:false,side:THREE.DoubleSide});
 function glassCage(cg){const s=cg.s,y=cg.y,fr=mat(0xd8dde2,'gunmetal',{r:.3,m:.9});
@@ -501,6 +511,7 @@ const MAPS={
      crate(x0+sd*.55,H,z0+L*.6);crate(x0+sd*.55,H,z0+L*.25);crate(x0+sd*.55,H+1.25,z0+L*.25);}
    // tanks
    tank(-15,-14,2.4,5.5,0xd8d2c4);tank(-9,-17.5,1.8,4.2,0xc9c2b2);tank(15.5,15.5,2.2,5,0xd8d2c4);
+   for(const[x,z,r,h]of[[-15,-14,2.4,5.5],[-9,-17.5,1.8,4.2],[15.5,15.5,2.2,5]]){const d=Math.hypot(x,z),nx=x/d,nz=z/d;ladder(x+nx*(r+.08),z+nz*(r+.08),nx,nz,0,h,-nx,-nz,true)}// on the far side, so the tank covers you while climbing
    // overhead pipe rack (crouch under)
    // low pipe run on concrete sleepers: low enough to see over (top 1.14 m) and to jump up on
    pipe('x',-19,4,10,.72,.42,0x9a8f7a);pipe('x',-19,4,10.9,.72,.42,0x7f7563);
@@ -515,7 +526,8 @@ const MAPS={
    solid(14,0,12,6,3,.2,wc,'concrete');
    solid(11.1,0,7.9,.2,3,1.6,wc,'concrete');solid(11.1,0,11.1,.2,3,1.6,wc,'concrete');solid(11.1,0,9.5,.2,1.1,1.6,wc,'concrete');solid(11.1,2.1,9.5,.2,.9,1.6,wc,'concrete');
    solid(16.9,0,8.1,.2,3,2,wc,'concrete');solid(16.9,0,11.2,.2,3,1.4,wc,'concrete');solid(16.9,2.2,9.85,.2,.8,1.7,wc,'concrete');
-   solid(14,3,9.5,6.4,.2,5.4,0x6d5a40,'metal');
+   solid(14,3,8.9,6.4,.2,4.2,0x6d5a40,'metal');solid(13.05,3,11.6,4.5,.2,1.2,0x6d5a40,'metal');solid(16.75,3,11.6,.9,.2,1.2,0x6d5a40,'metal');solid(15.8,3,12.05,1,.2,.3,0x6d5a40,'metal');
+   ladder(15.8,11.85,0,-1,0,3.2,0,-1,false);
    // cover
    crate(7.5,0,-8);crate(8.8,0,-8.2);crate(8.1,1.25,-8.1);crate(-8,0,7);crate(-8.3,0,5.7);
    crate(-15.5,0,1);crate(-15.5,0,-.3);crate(-15.5,1.25,.35);crate(17,0,-3);crate(-3,0,15.5);crate(-1.7,0,15.8);crate(4,0,-15.5);crate(4,1.25,-15.5);
@@ -619,7 +631,7 @@ const MAPS={
    for(const[x,z]of[[-17,-43],[17,43],[17,-43],[-17,43]]){solid(x,0,z,.3,10,.3,0x555555,'metal');solid(x,10,z,1.3,.3,.6,0x333333,'metal',{collide:false})}
   }}
 };
-for(const k in MAPS){const M=MAPS[k];M.hx=M.hx||M.half;M.hz=M.hz||M.half;BG=new THREE.Group();BX=[];M.build();
+for(const k in MAPS){const M=MAPS[k];M.hx=M.hx||M.half;M.hz=M.hz||M.half;BG=new THREE.Group();BX=[];LADS=[];M.build();M.ladders=LADS;
   const gm=new THREE.Mesh(new THREE.PlaneGeometry(M.hx*2+6,M.hz*2+6),mat(M.ground,M.groundTex));
   gm.material=gm.material.clone();gm.material.map=TEX[M.groundTex].clone();gm.material.map.needsUpdate=true;gm.material.map.repeat.set((M.hx*2+6)/7,(M.hz*2+6)/7);gm.material.bumpMap=gm.material.map;M.groundMat=gm.material;
   gm.rotation.x=-Math.PI/2;gm.receiveShadow=true;BG.add(gm);
@@ -1866,7 +1878,7 @@ function showNukeOver(by){const o=$('over');o.textContent='';const h=document.cr
   sTone(392,.3,.25,'triangle');setTimeout(()=>sTone(330,.5,.25,'triangle'),300)}
 function clearNuke(){const N=nukeState;if(N&&N.cloud){scene.remove(N.cloud.g);N.cloud.g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}nukeState=null;$('nukeT').hidden=true;$('nukeF').style.opacity=0}
 function endNukeRound(){clearNuke();matchOver=null;$('over').hidden=true;$('feed').textContent='';darkUntil=0;clearAtms();
-  P.kills=P.deaths=P.streak=0;P.bigbite=P.booth=P.vac=P.rkt=P.dark=P.atm=P.nuke=P.rockets=0;P.rkHold=false;if(state==='play')respawn()}
+  P.kills=P.deaths=P.streak=0;P.bigbite=P.booth=P.vac=P.rkt=P.dark=P.atm=P.nuke=P.rockets=0;P.rkHold=false;if(state==='play')waitForDeploy()}
 
 /* ---------------- Bankomat (7-kill streak) ----------------
    Drops an ATM in front of you. For 15 s it pulls every enemy toward it; it is solid, has 300 HP and can be shot
@@ -1946,7 +1958,7 @@ function ggWin(by){if(matchOver||!ggOn())return;matchOver={until:now+8,gg:true};
   $('board').hidden=false;renderBoard();const tb=$('board').querySelector('table');if(tb)o.appendChild(tb.cloneNode(true));$('board').hidden=true;o.hidden=false;$('death').hidden=true;
   if(by.me){sTone(523,.2,.25,'triangle');setTimeout(()=>sTone(659,.2,.25,'triangle'),180);setTimeout(()=>sTone(784,.45,.25,'triangle'),360)}else sTone(220,.4,.25,'triangle')}
 function ggTick(){if(matchOver&&matchOver.gg){$('death').hidden=true;if(now>matchOver.until)ggReset()}}
-function ggReset(){matchOver=null;$('over').hidden=true;$('feed').textContent='';P.kills=P.deaths=P.streak=0;P.ggLvl=0;ggApply();if(state==='play')respawn()}
+function ggReset(){matchOver=null;$('over').hidden=true;$('feed').textContent='';P.kills=P.deaths=P.streak=0;P.ggLvl=0;ggApply();if(state==='play')waitForDeploy()}
 
 /* ---------------- player ---------------- */
 const P={pos:new V3(),vel:new V3(),h:H_STAND,eye:1.6,onGround:true,crouch:false,yaw:0,pitch:0,hp:100,alive:false,wi:0,primary:store.get('gun',0),ammo:[],reloadT:0,fireT:0,switchT:0,adsP:0,sprint:false,sprintOutT:0,
@@ -2046,6 +2058,8 @@ addEventListener('keydown',e=>{
   if(e.code==='Digit6')useNuke();
 });
 addEventListener('keyup',e=>{keys[e.code]=false;if(e.code==='Tab')$('board').hidden=true});
+function ladderAt(){const L=curMap&&curMap.ladders;if(!L||!L.length||!P.alive)return null;
+  for(const d of L){const px=P.pos.x-d.x,pz=P.pos.z-d.z;const dn=px*d.nx+pz*d.nz,dl=px*d.lx+pz*d.lz;if(dn>-.15&&dn<.75&&Math.abs(dl)<.45&&P.pos.y>d.y0-.1&&P.pos.y<d.y1+.15)return d}return null}
 function tryStand(){P.h=H_STAND;if(free(P,P.pos.y))P.crouch=false;else P.h=H_CROUCH}
 
 /* ---------------- combat ---------------- */
@@ -2179,7 +2193,8 @@ function onMyKill(vName,head,wb,wi,ns){P.kills++;P.streak++;popup(head?'Headshot
   if(P.streak===10)popup('10 drap på rad · urørlig',true);else if(P.streak%5===0)popup(P.streak+' drap på rad',true);
   sendPresence(true)}
 function tryRespawn(){if(KC.active){kcEnd();P.deadAt=Math.min(P.deadAt,now-4);return}if(P.alive||now-P.deadAt<1.8||matchOver||sdLive()||KC.pending)return;respawn()}
-function respawn(){kcEnd();const s=pickSpawn();P.pos.set(s[0],0,s[1]);P.vel.set(0,0,0);P.yaw=Math.atan2(s[0],s[1])+rand(-.5,.5);P.pitch=0;P.hp=100;P.alive=true;
+function waitForDeploy(){P.alive=false;P.deadAt=now-2;P.killer=null;P.newRound=true;sendPresence(true);renderDeath();$('death').hidden=false}
+function respawn(){P.newRound=false;kcEnd();const s=pickSpawn();P.pos.set(s[0],0,s[1]);P.vel.set(0,0,0);P.yaw=Math.atan2(s[0],s[1])+rand(-.5,.5);P.pitch=0;P.hp=100;P.alive=true;
   P.ammo=EFF.map(w=>w.mag);P.ammoH=EFF.map((w,i)=>akMag(i));P.wi=P.primary;P.reloadT=0;P.fireT=0;P.boltAt=0;P.holdSub=false;P.rkHold=false;P.handT=[0,0];P.knockT=0;P.boothUntil=0;P.burnUntil=0;P.slowUntil=0;P.spawnT=now;P.crouch=false;P.h=H_STAND;P.adsP=0;P.switchT=now+.3;$('death').hidden=true;sendPresence(true)}
 /* Spawn choice: stay out of every enemy's line of sight first, then as far from the nearest enemy as possible. */
 function pickSpawn(){if(sdLive()&&myTeam>=0&&curMap.sdSpawnsV)return sdSpawnFor(myRole());
@@ -2332,7 +2347,7 @@ function renderBoard(){const b=$('board');const rows=roster();b.textContent='';
     for(const v of[r.k,r.d,ggOn()?((r.gl|0)+1)+'/'+GG_LADDER.length:r.s]){const c=document.createElement('td');c.className='n';c.textContent=v;tr.appendChild(c)}tb.appendChild(tr)}
   b.appendChild(tb)}
 function renderDeath(){const d=$('death');d.textContent='';const h=document.createElement('h2');
-  const k=P.killer;h.textContent=(!k||k.me)?'Selvmål':'Drept av '+k.name;if(k&&!k.me)h.style.color=COLORS[k.ci%8];d.appendChild(h);
+  const k=P.killer;h.textContent=P.newRound?'Ny runde':(!k||k.me)?'Selvmål':'Drept av '+k.name;if(k&&!k.me)h.style.color=COLORS[k.ci%8];d.appendChild(h);
   const s=document.createElement('div');s.className='sub';s.textContent='Velg primærvåpen, og gå inn.';d.appendChild(s);
   const pk=document.createElement('div');pk.className='picks';PRIMARIES.forEach((wi,i)=>{const e=document.createElement('span');e.textContent=(i+1)+' · '+WEAPONS[wi].name;if(wi===P.primary)e.className='on';pk.appendChild(e)});d.appendChild(pk);
   if(ggOn()){s.textContent='Gun Game · våpen '+(P.ggLvl+1)+'/'+GG_LADDER.length+': '+ggName(P.ggLvl);pk.remove()}
@@ -2352,7 +2367,7 @@ function updateHUD(dt){const w=EFF[P.wi];
   {const hp=Math.max(0,Math.round(P.hp));$('hpNum').textContent=hp;$('hpBar').style.width=hp+'%';const h=$('hp');h.classList.toggle('low',hp<35);h.classList.toggle('regen',hp<100&&now-P.lastHurt>4)}
   $('vig').style.opacity=P.alive?clamp((1-P.hp/100)*1.1,0,.95):.9;
   $('scope').hidden=!(w.scope&&P.adsP>.9&&P.alive);
-  if(!$('death').hidden){const n=$('deployNote');if(n){const left=Math.max(0,6-(now-P.deadAt));n.textContent=sdLive()?'Du er ute denne runden. Du flyttes til tilskuerburet…':now-P.deadAt<1.8?'Snart klar…':'Trykk mellomrom eller klikk for å gå inn · automatisk om '+Math.ceil(left)+' s'}if(now-P.deadAt>6&&!matchOver&&!sdLive()&&!kcBusy())respawn()}
+  if(!$('death').hidden){const n=$('deployNote');if(n){n.textContent=sdLive()?'Du er ute denne runden. Du flyttes til tilskuerburet…':now-P.deadAt<1.8?'Snart klar…':'Trykk mellomrom, klikk eller A på kontrolleren for å gå inn'}}
   if(!$('board').hidden&&((now*4)|0)!==((now-dt)*4|0))renderBoard();
   if(((now*3)|0)!==((now-dt)*3|0))renderScore();
   const nb=$('netBadge');nb.textContent=netState==='online'?'● Tilkoblet · '+(remotes.size+1)+' på '+curMap.name:'○ Kobler til på nytt…';
@@ -2481,9 +2496,14 @@ function updatePlayer(dt){const w=EFF[P.wi];
   let speed=P.crouch?2.7:(P.sprint?7.5:5.3);speed*=w.speed*(1-.45*P.adsP)*(now<P.slowUntil?.55:1);
   const sy=Math.sin(P.yaw),cy=Math.cos(P.yaw);let wx=-sy*fwd+cy*str,wz=-cy*fwd-sy*str;const l=Math.hypot(wx,wz);if(l>1){wx/=l;wz/=l}
   const acc=P.onGround?(now<P.knockT?2:14):(now<P.knockT?.6:2.5);P.vel.x+=(wx*speed-P.vel.x)*Math.min(1,acc*dt);P.vel.z+=(wz*speed-P.vel.z)*Math.min(1,acc*dt);
-  if((jumpQ||keys.Space||padJumpHeld)&&P.onGround&&!chatOpen){if(P.crouch)tryStand();if(!P.crouch){P.vel.y=JUMP;P.onGround=false}}jumpQ=false;
+  const LD=ladderAt();P.onLadder=!!LD&&now>(P.ladderOff||0);
+  if(P.onLadder){const up=(keys.KeyW||padMove.y<-.4)?1:(keys.KeyS||padMove.y>.4)?-1:0;P.sprint=false;
+    if(jumpQ&&!chatOpen){P.vel.x+=LD.nx*4.5;P.vel.z+=LD.nz*4.5;P.vel.y=4.5;P.ladderOff=now+.45;P.onLadder=false;jumpQ=false}
+    else if(up>0&&P.pos.y>=LD.y1-.05){P.vel.x=LD.ex*3.2;P.vel.z=LD.ez*3.2;P.climbV=1.2}
+    else{P.climbV=up*3.4;P.vel.x*=.25;P.vel.z*=.25}}
+  if((jumpQ||keys.Space||padJumpHeld)&&P.onGround&&!chatOpen&&!P.onLadder){if(P.crouch)tryStand();if(!P.crouch){P.vel.y=JUMP;P.onGround=false}}jumpQ=false;
   P.h=P.crouch?H_CROUCH:H_STAND;
-  let rem=dt;while(rem>0){const s=Math.min(rem,1/120);moveEntity(P,s);atmStep(s);rem-=s}
+  let rem=dt;while(rem>0){const s=Math.min(rem,1/120);if(P.onLadder)P.vel.y=P.climbV+G*s;moveEntity(P,s);atmStep(s);rem-=s}
   P.speed=Math.hypot(P.vel.x,P.vel.z);
   const cycling=w.bolt&&now<P.fireT&&now>P.firedAt+.1;
   P.adsP=approach(P.adsP,rmb&&!P.sprint&&now>P.switchT&&!cycling&&!w.noAds&&!P.holdSub?1:0,dt/w.adsTime);
