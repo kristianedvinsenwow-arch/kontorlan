@@ -1040,7 +1040,7 @@ function animSoldier(s,e,dt){s.g.position.copy(e.pos);s.g.rotation.y=e.yaw;const
   s.upper.position.y=.93+Math.abs(Math.cos(s.ph))*amp*.04;
   {const k=headK(e);if(s.headK!==k){s.headK=k;s.head.scale.setScalar(k);s.head.position.y=.79+.1*(k-1);s.tag.position.y=2.1+.23*(k-1)}}
   if(e.bo!=null){if(!s.booth&&e.bo)s.booth=makeBooth();if(s.booth)animBooth(s.booth,!!(e.bo&&e.alive),e.pos,e.byw||0,dt)}
-  setSoldierHat(s,e.ht==null?-1:e.ht);setSoldierOutfit(s,e.of==null?-1:e.of);if(s.hat&&s.hat.userData.spin)s.hat.userData.spin.rotation.y+=dt*14;
+  setSoldierHat(s,e.ht==null?-1:e.ht);setSoldierOutfit(s,e.of==null?-1:e.of);if(s.hat&&s.hat.userData.spin)s.hat.userData.spin.rotation.y+=dt*14;if(s.hat&&s.hat.userData.turret)s.hat.userData.turret.rotation.y=Math.sin(now*.7+s.g.position.x)*1.3;
   const wi=e.w|0;s.sub.visible=wi===SUBW;
   if(wi<WEAPONS.length){const cm=e.cm|0,at=e.at==null?-1:e.at|0,key=cm*16+at+1;
     if(s.guns[wi].key!==key){const o=s.guns[wi];s.arms.remove(o.g);o.g.traverse(q=>{if(q.geometry)q.geometry.dispose()});const aid=at>=0&&ATT[WEAPONS[wi].id][at]?ATT[WEAPONS[wi].id][at].id:'';
@@ -1066,8 +1066,11 @@ const HATS=[
  {id:'cleancap',name:'Vaskekaps',w:8,t:0,ks:1},{id:'mop',name:'Moppeparykk',w:8,t:1,ks:1},{id:'robovac',name:'Robotstøvsuger',w:8,t:2,ks:1},
  {id:'earmuffs',name:'Hørselvern',w:9,t:0,ks:1},{id:'welder',name:'Sveisemaske',w:9,t:1,ks:1},{id:'rockethat',name:'Rakett',w:9,t:2,ks:1},
  {id:'sleepmask',name:'Sovemaske',w:10,t:0,ks:1},{id:'headlamp',name:'Pannelykt',w:10,t:1,ks:1},{id:'disco',name:'Diskokule',w:10,t:2,ks:1},
- {id:'headband',name:'Pannebånd',w:4,t:0},{id:'knight',name:'Ridderhjelm',w:4,t:1},{id:'pirate',name:'Piratlue',w:4,t:2},{id:'unicorn',name:'Enhjørning',w:4,t:3}];
-const HAT_W=['Assault','SMG','Hægglo','Sniper','Kniv','Revolver','BigBite','Sikkerhetsrom','Støvsuger','Rakettkaster','Demp lyset'];
+ {id:'headband',name:'Pannebånd',w:4,t:0},{id:'knight',name:'Ridderhjelm',w:4,t:1},{id:'pirate',name:'Piratlue',w:4,t:2},{id:'unicorn',name:'Enhjørning',w:4,t:3},
+ {id:'flatcap',name:'Sixpence',w:11,t:0},{id:'deerstalker',name:'Jaktlue',w:11,t:1},{id:'antlers',name:'Reinsdyrgevir',w:11,t:2},{id:'decoy',name:'Lokkeand',w:11,t:3},
+ {id:'boonie',name:'Jungelhatt',w:12,t:0},{id:'nvg',name:'Nattkikkert',w:12,t:1},{id:'satdish',name:'Parabol',w:12,t:2},{id:'minitank',name:'Mini-stridsvogn',w:12,t:3}];
+const HAT_W=['Assault','SMG','Hægglo','Sniper','Kniv','Revolver','BigBite','Sikkerhetsrom','Støvsuger','Rakettkaster','Demp lyset','725','.50 Cal'];
+const hatGroupOf=wi=>wi<=5?wi:wi===6?11:wi===7?12:-1;// weapon index -> hat group
 const KS_TIERS=[{name:'Vanlig',p:.3,col:'#a9a89e'},{name:'Sjelden',p:.2,col:'#4ea1e8'},{name:'Episk',p:.1,col:'#b77be8'}];
 const tierOf=h=>h.ks?KS_TIERS[h.t]:HAT_TIERS[h.t];
 const KS_HATW={bigbite:6,booth:7,vac:8,rocket:9,dark:10};
@@ -1076,7 +1079,7 @@ let hatSel=(()=>{const v=store.get('hatSel','');return HATS.some(h=>h.id===v)?v:
 const hatOwned=id=>camoAll||hatsOwned.has(id);
 const hatIdx=()=>hatSel&&hatOwned(hatSel)?HATS.findIndex(h=>h.id===hatSel):-1;
 function nextHat(w){return HATS.find(h=>h.w===w&&!hatsOwned.has(h.id))}
-function rollHat(w){if(w<0||w>10)return;const h=nextHat(w);if(!h)return;if(Math.random()>=tierOf(h).p)return;
+function rollHat(w){if(w<0||w>12)return;const h=nextHat(w);if(!h)return;if(Math.random()>=tierOf(h).p)return;
   hatsOwned.add(h.id);store.set('hats',[...hatsOwned]);const T=tierOf(h);
   popup('Ny hatt: '+h.name+' · '+T.name,true);sTone(523,.12,.22,'triangle');setTimeout(()=>sTone(784,.12,.22,'triangle'),110);setTimeout(()=>sTone(1047,.25,.22,'triangle'),220);
   chatLine(null,0,'Du fikk hatten «'+h.name+'» ('+T.name+', '+(T.p*100).toString().replace('.',',')+' %). Ta den på i menyen (Esc).',true);
@@ -1349,6 +1352,41 @@ function hatModel(id){const g=new THREE.Group();
     for(const z of[-.035,.035]){const f=mesh(new THREE.ExtrudeGeometry(sh,{depth:.012,bevelEnabled:false,curveSegments:16}),b,g);f.position.set(0,.06,z-.006)}
     const gt=metal(0xd6a83a,.25);const tr=mesh(new THREE.TorusGeometry(.2,.005,6,40,Math.PI*.98),gt,g);tr.position.set(0,.03,-.05);tr.scale.set(1.2,.82,1);
     const sk=M(0xf2f2ea,{r:.5});ball(g,v3(0,.13,-.05),.028,sk,12);for(const s of[-1,1]){const bn=bx(g,.07,.01,.01,sk,0,.1,-.05,0,0,s*.6)}break}
+  case 'flatcap':{const tw=mat(0x6e5c44,'cloth',{r:.95});const d=half(.126,tw,.42,.045);d.scale.z=1.08;const b=bx(g,.2,.014,.1,tw,0,.06,-.125);b.rotation.x=.28;
+    ball(g,v3(0,.1,-.02),.012,tw,8);ring(.122,.006,mat(0x4a3c2c,'cloth',{r:.95}),.05);break}
+  case 'deerstalker':{const tw=mat(0x8a7656,'cloth',{r:.95}),dk=mat(0x5a4a34,'cloth',{r:.95});half(.13,tw,.85,.03);
+    const f=bx(g,.16,.012,.09,tw,0,.045,-.15);f.rotation.x=.45;const bk=bx(g,.16,.012,.09,tw,0,.045,.15);bk.rotation.x=-.45;
+    for(const x of[-.11,.11]){const e=bx(g,.012,.07,.09,tw,x,.13,0);e.rotation.z=x>0?.7:-.7}bx(g,.05,.012,.02,dk,0,.145,0);for(const x of[-.025,.025]){const k=bx(g,.03,.008,.016,dk,x,.148,0);k.rotation.y=x>0?.6:-.6}
+    ring(.128,.008,dk,.045);break}
+  case 'antlers':{const br=mat(0x6a4a2a,'walnut',{r:.6}),bn=mat(0xd8c8a8,null,{r:.6});ring(.12,.012,br,.07,Math.PI/2+.15);
+    for(const sd of[-1,1]){const a=v3(sd*.07,.11,0),b=v3(sd*.13,.24,.02),c=v3(sd*.2,.36,-.01),d=v3(sd*.22,.46,.05);limb(g,a,b,.016,.014,bn,8);limb(g,b,c,.014,.011,bn,8);limb(g,c,d,.011,.007,bn,8);
+      limb(g,b,v3(sd*.08,.32,-.05),.01,.006,bn,6);limb(g,c,v3(sd*.13,.44,-.06),.009,.005,bn,6);limb(g,c,v3(sd*.28,.4,-.04),.008,.005,bn,6);ball(g,a,.022,br,8)}break}
+  case 'decoy':{const br=mat(0x6a4a2e,'walnut',{r:.55}),gr=mat(0x1f6a3a,null,{r:.3,m:.2}),wh=mat(0xf0ece0,null,{r:.6}),yl=mat(0xe8b830,null,{r:.5}),bk=mat(0x111111,null,{r:.3});
+    disc(.11,.02,mat(0x3a5a7a,null,{r:.15,m:.2}),.115,24);const body=ball(g,v3(0,.18,.01),.1,br,18);body.scale.set(.75,.55,1.25);const tail=ball(g,v3(0,.2,.13),.04,bk,10);tail.scale.set(.8,.5,1.2);
+    const wing=ball(g,v3(0,.21,.02),.085,mat(0x8a6a44,'walnut',{r:.55}),14);wing.scale.set(.8,.4,1.1);const sp=bx(g,.13,.01,.03,mat(0x2a5bd6,null,{r:.3,m:.3}),0,.235,.05);
+    ring(.032,.008,wh,.25,Math.PI/2);const hd=ball(g,v3(0,.3,-.09),.045,gr,14);hd.scale.set(.85,.95,1.1);limb(g,v3(0,.21,-.06),v3(0,.28,-.08),.032,.03,gr,10);
+    const bl=bx(g,.03,.012,.05,yl,0,.29,-.145);bl.rotation.x=.15;for(const x of[-.034,.034])ball(g,v3(x,.31,-.11),.007,bk,6);break}
+  case 'boonie':{const ol=mat(0x5a6340,'cloth',{r:.95}),dk=mat(0x3e4530,'cloth',{r:.95});half(.125,ol,.72,.04);
+    const br=mesh(new THREE.CylinderGeometry(.13,.2,.05,32,1,true),ol,g);br.material=ol;br.position.y=.035;ol.side=THREE.DoubleSide;
+    ring(.127,.012,dk,.06);for(let i=0;i<10;i++){const a=i/10*TAU;const l=bx(g,.035,.012,.004,mat(0x3a5a2a,null,{r:.9}),Math.cos(a)*.128,.06,Math.sin(a)*.128,0,-a,0);l.rotation.y=-a+Math.PI/2}
+    limb(g,v3(-.11,.03,0),v3(0,-.12,-.08),.003,.003,dk,4);limb(g,v3(.11,.03,0),v3(0,-.12,-.08),.003,.003,dk,4);break}
+  case 'nvg':{const ol=mat(0x4e553c,'cloth',{r:.7}),bk=mat(0x151617,'polymer',{r:.5}),gl=new THREE.MeshStandardMaterial({color:lin(0x2aff6a),emissive:lin(0x1a8a3a),emissiveIntensity:1.2,roughness:.1});
+    const h=half(.135,ol,.9,.02);h.scale.z=1.05;ring(.136,.012,bk,.03);bx(g,.06,.04,.025,bk,0,.11,-.13);
+    const arm=new THREE.Group();arm.position.set(0,.13,-.15);arm.rotation.x=.95;g.add(arm);bx(arm,.05,.025,.05,bk,0,0,-.02);
+    for(const x of[-.035,.035]){cz(arm,.022,.11,bk,x,-.01,-.09,16);const l=mesh(new THREE.CircleGeometry(.018,16),gl,arm);l.position.set(x,-.01,-.146);l.rotation.y=Math.PI}
+    bx(g,.08,.05,.05,bk,0,.1,.14);for(const x of[-.12,.12])bx(g,.015,.03,.05,bk,x,.06,-.02);break}
+  case 'satdish':{const wh=mat(0xe8e8e4,null,{r:.4,m:.1}),gr=metal(0x9a9ea2,.35),rd=new THREE.MeshStandardMaterial({color:lin(0xff2a1a),emissive:lin(0xff2a1a),emissiveIntensity:1.5});
+    half(.12,mat(0x2a2c30,'cloth',{r:.9}),.5,.04);disc(.05,.02,gr,.1);limb(g,v3(0,.1,0),v3(0,.26,.02),.012,.012,gr,8);
+    const dish=new THREE.Group();dish.position.set(0,.3,0);dish.rotation.x=-.75;g.add(dish);
+    const bowl=mesh(new THREE.SphereGeometry(.16,28,12,0,TAU,Math.PI*.72,Math.PI*.28),wh,dish);bowl.material.side=THREE.DoubleSide;bowl.position.y=.13;
+    limb(dish,v3(0,-.03,.0),v3(0,.07,-.0),.006,.006,gr,6);for(const a of[0,2.1,4.2])limb(dish,v3(Math.cos(a)*.09,-.01,Math.sin(a)*.09),v3(0,.11,0),.004,.004,gr,6);
+    cz(dish,.014,.04,mat(0x333333,null,{r:.4}),0,.12,0,10).rotation.x=0;const led=ball(dish,v3(0,.14,0),.008,rd,8);led.userData.blink=true;g.userData.spin=null;break}
+  case 'minitank':{const ol=mat(0x55603e,'cloth',{r:.75}),dk=mat(0x2a2c26,'polymer',{r:.6}),st=metal(0x6e7266,.4);
+    half(.12,mat(0x2a2c30,'cloth',{r:.9}),.45,.04);bx(g,.2,.05,.27,ol,0,.13,0);bx(g,.16,.03,.2,ol,0,.17,.01);
+    for(const x of[-.115,.115]){bx(g,.045,.055,.3,dk,x,.125,0);for(let i=0;i<5;i++){const w=cx(g,.02,.05,st,x,.115,-.11+i*.055);}}
+    const tur=new THREE.Group();tur.position.set(0,.19,.02);g.add(tur);const td=disc(.075,.05,ol,0);g.remove(td);tur.add(td);td.position.y=.025;
+    const bar=cz(tur,.012,.2,st,0,.03,-.15,12);cz(tur,.018,.03,st,0,.03,-.25,12);bx(tur,.03,.012,.04,dk,.03,.055,.02);cz(tur,.003,.12,dk,-.04,.11,.03,4).rotation.x=0;
+    const ant=mesh(new THREE.CylinderGeometry(.002,.002,.12,4),dk,tur);ant.position.set(-.045,.11,.03);tur.userData.turret=true;g.userData.turret=tur;break}
   case 'unicorn':{const pink=M(0xf5b3d4,{r:.6}),gd=mat(0xffd34d,'gunmetal',{r:.2,m:1});half(.124,M(0xfafafa,{r:.8}),.85,.03);
     const h=mesh(new THREE.ConeGeometry(.035,.24,16),gd,g);h.position.set(0,.2,-.06);h.rotation.x=-.35;for(let i=0;i<5;i++){const t=mesh(new THREE.TorusGeometry(.031-i*.006,.004,6,16),pink,g);t.position.set(0,.12+i*.04,-.032-i*.015);t.rotation.x=Math.PI/2-.35}
     for(const s of[-1,1]){const e=mesh(new THREE.ConeGeometry(.03,.07,8),pink,g);e.position.set(s*.085,.15,.01);e.rotation.z=-s*.4}
@@ -2118,7 +2156,7 @@ function die(att,wi,head,wb,ns){P.alive=false;P.hp=0;P.deaths++;P.streak=0;P.dea
   const self=!att||att.me;
   safeEmit('kill',{k:self?myPeer:(att.peer||null),w:wi|0,h:head?1:0,b:wb?1:0,n:ns&&isGun(wi)?1:0});
   sendPresence(true);renderDeath();$('death').hidden=false;if(sdLive()){P.deadSD=true;sdDeadReport=0}if(wi!==NUKE)kcQueue(att,wi)}
-function onMyKill(vName,head,wb,wi,ns){P.kills++;P.streak++;popup(head?'Headshot':'+1 drap '+vName,false);if(wb)popup('Wallbang',true);if(ns)popup('Noscope',true);if(wi<=5)rollHat(wi);if(wi>=0&&wi<WEAPONS.length)rollOutfit(wi);
+function onMyKill(vName,head,wb,wi,ns){P.kills++;P.streak++;popup(head?'Headshot':'+1 drap '+vName,false);if(wb)popup('Wallbang',true);if(ns)popup('Noscope',true);if(hatGroupOf(wi)>=0)rollHat(hatGroupOf(wi));if(wi>=0&&wi<WEAPONS.length)rollOutfit(wi);
   if(wi>=0&&wi<WEAPONS.length){wk[wi]++;store.set('wk',wk);const A=ATT[WEAPONS[wi].id].find(a=>a.need===wk[wi]);if(A&&!camoAll){popup(A.name+' låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+A.name+' til '+WEAPONS[wi].name+'. Utstyr det i menyen (Esc).',true)}}
   if(wi>=0&&wi<WEAPONS.length&&WEAPONS[wi].melee){const u=CAMOS.find(c=>c.need===wk[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · Kniv',true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til kniven. Utstyr den i menyen (Esc).',true)}}
   if(head&&wi>=0&&wi<WEAPONS.length&&!WEAPONS[wi].melee){hs[wi]++;store.set('hs',hs);const u=CAMOS.find(c=>c.need===hs[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til '+WEAPONS[wi].name+'. Utstyr den i menyen (Esc).',true)}}
@@ -2366,7 +2404,7 @@ function renderCamo(){const grid=$('camoGrid');if(!grid)return;renderGuns();grid
 function renderMenuState(){const tb=$('teamBtn');if(tb){tb.hidden=!tdmOn();if(tdmOn()&&myTeam>=0){tb.textContent='Bytt lag · du er på '+TEAMN[myTeam];tb.style.borderColor=TEAMC[myTeam]}}for(const b of document.querySelectorAll('[data-join]')){const k=b.dataset.join;const cur=state==='play'&&curMap&&curMap.key===k;b.textContent=cur?'Fortsett':(state==='play'?'Bytt til dette kartet':'Bli med')}}
 $('resumeBtn2').onclick=()=>lock();$('teamBtn').onclick=()=>tdmSwitch();$('leaveBtn2').onclick=()=>backToMenu();
 function renderHats(){const g=$('hatGrid');if(!g)return;g.textContent='';
-  [0,1,2,3,5,4,6,7,8,9,10].forEach(w=>{const wn=HAT_W[w];const grp=document.createElement('div');grp.className='hg';const l=document.createElement('div');l.className='wl';l.textContent=wn;const row=document.createElement('div');row.className='row4';grp.append(l,row);g.appendChild(grp);const nx=nextHat(w);
+  [0,1,2,3,5,11,12,4,6,7,8,9,10].forEach(w=>{const wn=HAT_W[w];const grp=document.createElement('div');grp.className='hg';const l=document.createElement('div');l.className='wl';l.textContent=wn;const row=document.createElement('div');row.className='row4';grp.append(l,row);g.appendChild(grp);const nx=nextHat(w);
     HATS.filter(h=>h.w===w).forEach(h=>{const T=tierOf(h),own=hatOwned(h.id);const b=document.createElement('button');b.type='button';b.className='hat'+(own?'':' locked')+(!own&&nx===h&&!camoAll?' next':'');
       b.style.borderColor=T.col;b.setAttribute('aria-pressed',hatSel===h.id&&own);b.title=h.name+' · '+T.name+' · '+(T.p*100).toString().replace('.',',')+(h.ks?' % hver gang du bruker '+wn:' % per drap med '+wn);b.setAttribute('aria-label',b.title);
       b.dataset.p=(T.p*100).toString().replace('.',',')+'%';const im=document.createElement('i');try{im.style.backgroundImage='url('+hatThumb(h.id)+')'}catch(e){}b.appendChild(im);
