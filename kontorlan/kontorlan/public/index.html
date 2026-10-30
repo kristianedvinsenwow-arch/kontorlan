@@ -1704,7 +1704,7 @@ function kcVM(ks,rm,dt){const w=ks[6]|0;subVM.visible=w===SUBW;KC.kick=Math.max(
     G.g.rotation.order='ZYX';G.g.position.set(A[0],A[1],A[2]);G.g.rotation.set(A[3],A[4],A[5]);muzzle.visible=false;return}
   G.g.rotation.order='XYZ';
   if(W.bolt){const bk=se>.12?(se-.12)/W.bolt:-1;(G.bolts||[]).forEach(b=>boltPose(b,bk));if(bk>=0&&bk<1){const e=Math.sin(bk*Math.PI);rz-=.35*e;rx+=.12*e;x-=.03*e;y-=.02*e}}
-  if(G.pump){const pk=(se-.12)/.45;pumpPose(G.pump,pk);if(pk>0&&pk<1){const e=Math.sin(pk*Math.PI);rz+=.12*e;rx+=.05*e}}
+  if(G.pump){const pk=(se-.12)/.45;pumpPose(G.pump,pk);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(pk>0&&pk<1){const e=Math.sin(pk*Math.PI);rz+=.12*e;rx+=.05*e}}
   if(G.parts)G.parts.forEach((pt,h)=>{const on=(h===0)===!!KC.hand?kk:0;pt.rotation.x=on*.32;pt.position.z=on*.07});
   G.g.position.set(x,y,z);G.g.rotation.set(rx,ry,rz);
   muzzle.visible=se<.05&&!(rm&&rm.sl)&&!scoped;if(muzzle.visible){const mx=G.akimbo?(KC.hand?.19:-.19):0;muzzle.position.set(x+mx,y+.01,z+G.tip);muzzle.rotation.z=Math.random()*3;muzzle.scale.setScalar(rand(.28,.4)*(1-.75*ad));muzzle.material.opacity=.55*(1-.7*ad)}}
@@ -1732,17 +1732,23 @@ const gripOf=id=>id==='fifty'?v3(0,-.075,.07):id==='dbl'?v3(0,-.05,.085):id==='r
 function armTo(parent,from,to,side){limb(parent,from,to.clone().add(v3(side*.02,-.02,.06)),.055,.045,sleeveM,14);limb(parent,to.clone().add(v3(side*.025,-.02,.07)),to.clone().add(v3(side*.02,-.02,.04)),.05,.05,cuffM,14);const h=ball(parent,to,.036,gloveM,14);h.scale.set(1.1,1.2,1.3);return h}
 function noShadow(g){g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}})}
 function buildGun(i){return buildGunFor(i,camoSel[i],attOf(i))}
+// The gun sits on its own pivot inside the viewmodel group so inspect spins can turn the gun without the arms.
+const ARM_MATS=new Set([sleeveM,cuffM,gloveM]);
+const GUN_PIVOT={revolver:[0,-.014,0],knife:[0,0,.02],shotgun:[0,.0,-.1],dbl:[0,.0,-.08]};
+function splitPivot(g,id){const pv=v3(...(GUN_PIVOT[id]||[0,0,0]));const piv=new THREE.Group();piv.position.copy(pv);piv.userData.base=pv.clone();
+  for(const c of g.children.slice()){if(c.userData.arm||(c.isMesh&&ARM_MATS.has(c.material)))continue;g.remove(c);c.position.sub(pv);piv.add(c)}g.add(piv);return piv}
 function buildGunFor(i,camo,att){const id=WEAPONS[i].id;
   if(att==='akimbo'){const c=new THREE.Group();const A=gunModel(id,camo,att),B=gunModel(id,camo,att);A.g.position.x=.19;B.g.position.x=-.19;B.g.scale.x=-1;c.add(A.g,B.g);
     for(const m of[A,B])armTo(m.g,v3(.13,-.24,.5),gripOf(id),1);
-    for(const m of[A,B])mergeDeep(m.g);noShadow(c);c.visible=false;vmRoot.add(c);return{g:c,tip:A.tip,sightY:A.sightY,adsZ:-.3,bolts:[A.bolt,B.bolt],cyls:[A.cyl,B.cyl],parts:[A.g,B.g],akimbo:true}}
+    for(const m of[A,B])mergeDeep(m.g);const pivs=[A,B].map(m=>splitPivot(m.g,id));noShadow(c);c.visible=false;vmRoot.add(c);return{g:c,tip:A.tip,sightY:A.sightY,adsZ:-.3,bolts:[A.bolt,B.bolt],cyls:[A.cyl,B.cyl],parts:[A.g,B.g],akimbo:true,pivs}}
   const m=gunModel(id,camo,att);const g=m.g;
   armTo(g,v3(.13,-.24,.5),gripOf(id),1);
-  if(!m.support){mergeDeep(g);noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[];return m}
-  const sp=v3(...m.support);const host=m.pump||g;
-  limb(host,v3(-.24,-.26,.18),sp.clone().add(v3(-.03,-.03,.08)),.055,.045,sleeveM,14);limb(host,sp.clone().add(v3(-.035,-.035,.1)),sp.clone().add(v3(-.025,-.025,.06)),.05,.05,cuffM,14);
-  const lh=ball(host,sp,.036,gloveM,14);lh.scale.set(1.2,1,1.4);
-  mergeDeep(g);noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[m.bolt];return m}
+  if(!m.support){mergeDeep(g);m.pivs=[splitPivot(g,id)];noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[];return m}
+  // left arm: its own group (follows the pump forward/back, but stays out of inspect spins)
+  const sp=v3(...m.support);const lhG=new THREE.Group();lhG.userData.arm=true;g.add(lhG);
+  limb(lhG,v3(-.24,-.26,.18),sp.clone().add(v3(-.03,-.03,.08)),.055,.045,sleeveM,14);limb(lhG,sp.clone().add(v3(-.035,-.035,.1)),sp.clone().add(v3(-.025,-.025,.06)),.05,.05,cuffM,14);
+  const lh=ball(lhG,sp,.036,gloveM,14);lh.scale.set(1.2,1,1.4);m.lhand=m.pump?lhG:null;
+  mergeDeep(g);m.pivs=[splitPivot(g,id)];noShadow(g);g.visible=false;vmRoot.add(g);m.bolts=[m.bolt];return m}
 const GUNS=WEAPONS.map((w,i)=>buildGun(i));GUNS.forEach((g,i)=>g.lk=camoSel[i]+':'+attOf(i));
 const akMag=i=>EFF[i].akimbo?[EFF[i].mag/2,EFF[i].mag/2]:null;
 function rebuildGun(i){const old=GUNS[i];vmRoot.remove(old.g);old.g.traverse(o=>{if(o.geometry)o.geometry.dispose()});EFF[i]=effW(i);GUNS[i]=buildGun(i);if(P.ammoH){P.ammoH[i]=akMag(i);if(P.ammoH[i]&&P.ammo)P.ammo[i]=EFF[i].mag}
@@ -2078,9 +2084,9 @@ function falloff(w,d){const t=clamp((d-w.range[0])/(w.range[1]-w.range[0]),0,1);
    (revolver spin, knife twirl, pump/bolt cycling). Firing, aiming, reloading, sprinting or switching cancels it. */
 const INSPECT={
   gun:{T:3.0,k:[[0,0,0,0,0,0,0],[.45,-.12,.05,.06,.15,.9,.55],[1.3,-.13,.06,.05,.2,1.0,.6],[1.75,-.08,.04,.06,-.1,-.6,-.9],[2.4,-.08,.05,.05,-.15,-.7,-1.0],[3.0,0,0,0,0,0,0]]},
-  shotgun:{T:3.2,k:[[0,0,0,0,0,0,0],[.45,-.12,.05,.06,.12,.95,.5],[1.3,-.13,.06,.05,.18,1.05,.55],[1.75,-.08,.04,.06,-.05,-.5,-.8],[2.6,-.08,.05,.05,-.1,-.6,-.85],[3.2,0,0,0,0,0,0]],pump:[2.0,2.5]},
+  shotgun:{T:3.6,toss:[.15,1.05],k:[[0,0,0,0,0,0,0],[.2,-.03,.03,.02,0,0,0],[1.1,-.04,.04,.02,0,0,0],[1.5,-.12,.05,.06,.12,.95,.5],[2.1,-.13,.06,.05,.18,1.05,.55],[2.5,-.08,.04,.06,-.05,-.5,-.8],[3.1,-.08,.05,.05,-.1,-.6,-.85],[3.6,0,0,0,0,0,0]],pump:[2.4,2.9]},
   sniper:{T:3.6,k:[[0,0,0,0,0,0,0],[.5,-.1,.06,.07,.1,.85,.45],[1.4,-.11,.07,.06,.16,.95,.5],[1.8,-.04,.02,.05,0,-.35,-.55],[3.0,-.04,.03,.05,-.05,-.4,-.6],[3.6,0,0,0,0,0,0]],bolt:[2.0]},
-  dbl:{T:3.0,k:[[0,0,0,0,0,0,0],[.4,-.1,.03,.07,-.35,.6,.35],[1.2,-.11,.04,.06,-.3,.7,.4],[1.7,-.06,.06,.05,.25,-.55,-.7],[2.4,-.06,.06,.05,.2,-.6,-.75],[3.0,0,0,0,0,0,0]]},
+  dbl:{T:3.6,toss:[.15,1.05],k:[[0,0,0,0,0,0,0],[.2,-.03,.03,.02,0,0,0],[1.1,-.04,.04,.02,0,0,0],[1.5,-.1,.03,.07,-.35,.6,.35],[2.2,-.11,.04,.06,-.3,.7,.4],[2.6,-.06,.06,.05,.25,-.55,-.7],[3.1,-.06,.06,.05,.2,-.6,-.75],[3.6,0,0,0,0,0,0]]},
   fifty:{T:3.8,k:[[0,0,0,0,0,0,0],[.8,-.08,.03,.05,.08,.6,.35],[1.8,-.09,.04,.05,.1,.65,.4],[2.2,-.06,-.04,.04,-.12,.4,.25],[2.35,-.06,-.02,.04,-.08,.4,.25],[2.5,-.06,-.045,.04,-.12,.4,.25],[3.0,-.04,0,.04,-.05,-.3,-.4],[3.8,0,0,0,0,0,0]]},
   revolver:{T:3.4,k:[[0,0,0,0,0,0,0],[.15,-.03,.04,.0,0,0,0],[1.0,-.05,.05,.0,0,0,0],[1.35,-.11,.06,.08,.1,.9,.5],[2.2,-.12,.07,.07,.15,1.0,.55],[2.6,-.07,.05,.07,-.1,-.6,-.8],[3.0,-.07,.05,.06,-.12,-.65,-.85],[3.4,0,0,0,0,0,0]],spin:[.12,1.0,2],cyl:[1.6,2.4]},
   knife:{T:2.7,k:[[0,0,0,0,0,0,0],[.2,-.05,.05,0,0,0,0],[.95,-.06,.06,0,0,0,0],[1.3,-.1,.08,.06,.1,1.1,1.3],[2.1,-.1,.09,.06,.15,1.2,1.4],[2.7,0,0,0,0,0,0]],twirl:[.15,.95]}};
@@ -2091,9 +2097,12 @@ function inspectPose(){if(!(P.inspectAt>0))return null;const I=INSPECT[P.inspect
   if(t>=I.T||!P.alive||mouseDown||rmb||P.reloadT>0||P.sprint||now<P.switchT||P.holdSub||P.rkHold){P.inspectAt=-9;return null}
   const K=I.k;let i=0;while(i<K.length-2&&t>K[i+1][0])i++;const a=K[i],b=K[i+1],u=clamp((t-a[0])/(b[0]-a[0]),0,1),e=u*u*(3-2*u);
   const o=a.map((v,j)=>v+(b[j]-v)*e);o[0]=t;
-  if(I.spin){const[s0,s1,n]=I.spin,q=clamp((t-s0)/(s1-s0),0,1);o[4]+=-(q*q*(3-2*q))*n*TAU}         // western spin around the trigger finger
-  if(I.twirl){const[s0,s1]=I.twirl,q=clamp((t-s0)/(s1-s0),0,1);o[5]+=(q*q*(3-2*q))*TAU*2}
-  return{o,t,I}}
+  const ph=r=>{const q=clamp((t-r[0])/(r[1]-r[0]),0,1);return{q,e:q*q*(3-2*q)}};
+  const pv={rx:0,rz:0,y:0,z:0};
+  if(I.spin){const p=ph(I.spin);pv.rx=-p.e*I.spin[2]*TAU}                        // western spin around the trigger finger
+  if(I.twirl){const p=ph(I.twirl);pv.rx=p.e*TAU*2}                                  // knife flipped around in the hand
+  if(I.toss){const p=ph(I.toss);const a=Math.sin(p.q*Math.PI);pv.rz=p.e*TAU;pv.y=a*.06;pv.z=-a*.42}        // shotgun tossed up and twisted round its barrel
+  return{o,t,I,pv}}
 function tryFire(forceHand){if(P.inspectAt>0)P.inspectAt=-9;
   if(inBooth()){if(firePressed||firePressed2){firePressed=firePressed2=false;leaveBooth()}return}
   if(sdNoCombat()){firePressed=firePressed2=false;return}
@@ -2558,7 +2567,7 @@ function updateView(dt){const w=EFF[P.wi];
     else{const bk=now<P.fireT?(now-P.boltAt)/w.bolt:-1;boltPose(G.bolts[0],bk);if(bk>=0&&bk<1){const e=Math.sin(Math.min(1,bk)*Math.PI);rz-=.35*e;rx+=.12*e;x-=.03*e;y-=.02*e}}}
   if(G.cyl)G.cyl.rotation.z=lerp(G.cyl.rotation.z,P.shots*TAU/6,Math.min(1,dt*18));
   if(G.cyls)G.cyls.forEach((c,h)=>{if(c){c.userData.n=c.userData.n||0;c.rotation.z=lerp(c.rotation.z,(P.cylN?P.cylN[h]:0)*TAU/6,Math.min(1,dt*18))}});
-  if(G.pump){const pk=(now-P.pumpAt)/.45;pumpPose(G.pump,pk);if(pk>0&&pk<1){const e=Math.sin(pk*Math.PI);rz+=.12*e;rx+=.05*e}}
+  if(G.pump){const pk=(now-P.pumpAt)/.45;pumpPose(G.pump,pk);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(pk>0&&pk<1){const e=Math.sin(pk*Math.PI);rz+=.12*e;rx+=.05*e}}
   const ka=now-P.knifeAnim;knifeVM.visible=ka<.45&&P.alive&&!P.holdSub&&P.meleeQuick;if(knifeVM.visible){const k=Math.sin(ka/.45*Math.PI);knifeVM.position.set(.12-k*.12,-.12,-.3-k*.25);knifeVM.rotation.set(-.2,.4-k*.6,0);y-=.3*k}
   g.position.set(x,y,z);g.rotation.set(rx,ry,rz);
   for(let h=0;h<2;h++){vmKickH[h]=Math.max(0,vmKickH[h]-dt*6);if(G.parts){const pt=G.parts[h];pt.rotation.x=vmKickH[h]*.32;pt.position.z=vmKickH[h]*.07;pt.position.y=vmKickH[h]*.012}}
@@ -2570,10 +2579,12 @@ function updateView(dt){const w=EFF[P.wi];
     g.rotation.order='ZYX';
     g.position.set(A[0]+sb,A[1]-sp*.04+Math.abs(Math.cos(walkPh))*.012*bob-(now<P.switchT?(P.switchT-now)/.35*.3:0),A[2]);
     g.rotation.set(A[3]-sp*.25,A[4],A[5])}else g.rotation.order='XYZ';
+  if(G.pivs)for(const pv of G.pivs){pv.rotation.set(0,0,0);pv.position.copy(pv.userData.base)}
   {const ip=inspectPose();if(ip){const o=ip.o,t=ip.t,I=ip.I;
-    if(G.akimbo&&G.parts&&I.spin){g.position.x+=o[1]*.3;g.position.y+=o[2];g.position.z+=o[3];for(const pt of G.parts)pt.rotation.x=o[4];g.rotation.y+=o[5]*.25;g.rotation.z+=o[6]*.25}
+    if(G.akimbo){g.position.x+=o[1]*.3;g.position.y+=o[2];g.position.z+=o[3];g.rotation.y+=o[5]*.25;g.rotation.z+=o[6]*.25}
     else{g.position.x+=o[1];g.position.y+=o[2];g.position.z+=o[3];g.rotation.x+=o[4];g.rotation.y+=o[5];g.rotation.z+=o[6]}
-    if(I.pump&&G.pump){const k=(t-I.pump[0])/(I.pump[1]-I.pump[0]);pumpPose(G.pump,k*.5);if(Math.abs(t-I.pump[0]-.05)<.02)sNoise(1600,.06,.18,'bandpass',2)}
+    if(G.pivs)for(const pv of G.pivs){pv.rotation.x=ip.pv.rx;pv.rotation.z=ip.pv.rz;pv.position.y+=ip.pv.y;pv.position.z+=ip.pv.z}
+    if(I.pump&&G.pump){const k=(t-I.pump[0])/(I.pump[1]-I.pump[0]);pumpPose(G.pump,k*.5);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(Math.abs(t-I.pump[0]-.05)<.02)sNoise(1600,.06,.18,'bandpass',2)}
     if(I.bolt&&G.bolts){const k=(t-I.bolt[0])/1.0;G.bolts.forEach(b=>boltPose(b,k));if(Math.abs(t-I.bolt[0]-.05)<.02)sNoise(2600,.05,.16,'bandpass',3)}
     if(I.cyl){if(t>I.cyl[0]&&t<I.cyl[1]){if(G.cyl)G.cyl.rotation.z+=.6;if(G.cyls)G.cyls.forEach(c=>{if(c)c.rotation.z+=.6})}}}}
   if(subVM.visible){const ta=now-P.subAt;const k=ta>0&&ta<.26?Math.sin(ta/.26*Math.PI):0;const raise=now<P.switchT?(P.switchT-now)/.3:0;subVM.position.set(.2-k*.1,-.2-raise*.2+k*.08+Math.abs(Math.cos(walkPh))*.01*bob,-.46-k*.25);subVM.rotation.set(-.15-k*.6,.15,.1)}
