@@ -200,7 +200,6 @@ label.chk{display:flex;align-items:center;gap:8px;text-transform:none;letter-spa
     <div id="netNote" class="note">Kobler til kontorrommet…</div>
     <div><span class="lbl">Utstyr · klikk et våpen for å tilpasse det</span><div id="guns" class="guns"></div></div>
     <div id="custom"><span class="lbl" id="customLbl">Kamuflasje</span><div id="camoGrid" class="camos"></div><div id="camoNote" class="note"></div><span class="lbl" style="margin-top:12px">Tilbehør · låses opp med drap · ett om gangen</span><div id="attGrid" class="atts"></div></div>
-    <div><span class="lbl">Ammunisjon · gjelder alle våpen når den er låst opp</span><div id="ammoGrid" class="seg"></div><div id="ammoNote" class="note"></div></div>
     <div><span class="lbl">Killstreaks · én for 3, 5 og 7 drap, atombombe på 25</span><div id="streakGrid" class="streaks"></div></div>
     <div><span class="lbl">Hatt</span><button id="hatBtn" class="hatpick" type="button"><i id="hatCur"></i><span><b id="hatCurName">Ingen hatt</b><small id="hatCount"></small></span><em>Bytt hatt</em></button></div>
     <details class="controls"><summary>Innstillinger og kontroller</summary>
@@ -304,7 +303,8 @@ const WEAPONS=[
  {id:'sniper', name:'Sniper',     blurb:'Boltrifle, quickscope',dmg:[110,110],range:[30,90],rpm:50,mag:5, reload:2.8,bolt:1.15,hip:.12, ads:0,   recoil:.14, auto:false,fov:20,speed:.85,adsTime:.26,pellets:1,head:1, snd:[300,.4],scope:true},
  {id:'knife',  name:'Kniv',        blurb:'To stikk forfra, ett bakfra',melee:true,dmg:[55,55],range:[1,1],rpm:60,mag:1,reload:0,hip:0,ads:0,recoil:0,auto:false,fov:75,speed:1.15,adsTime:.1,pellets:1,head:1,snd:[2500,.12]},
  {id:'revolver',name:'Revolver',     blurb:'',dmg:[50,34],range:[12,30],rpm:150,mag:6, reload:2.2,hip:.025,ads:.004,recoil:.075,auto:false,fov:60,speed:1.15,adsTime:.14,pellets:1,head:1.6,snd:[650,.24]},
- {id:'dbl',name:'725',blurb:'',dmg:[22,6],range:[6,15],rpm:900,mag:2,reload:2.0,hip:.08,ads:.05,recoil:.13,auto:false,fov:62,speed:1.0,adsTime:.2,pellets:8,head:1.2,snd:[380,.36]}
+ {id:'dbl',name:'725',blurb:'',dmg:[22,6],range:[6,15],rpm:900,mag:2,reload:2.0,hip:.08,ads:.05,recoil:.13,auto:false,fov:62,speed:1.0,adsTime:.2,pellets:8,head:1.2,snd:[380,.36]},
+ {id:'fifty',name:'.50 Cal',blurb:'',dmg:[95,85],range:[35,95],rpm:300,mag:10,reload:5.0,hip:.14,ads:0,recoil:.2,auto:false,fov:18,speed:.75,adsTime:.32,pellets:1,head:1.5,snd:[210,.55],scope:true,wallbang:true,bigKick:true}
 ];
 const CAMOS=[
  {name:'Fabrikk',need:0},
@@ -318,7 +318,7 @@ const CAMOS=[
  {name:'Diamant',need:300,diamond:true,file:'micro',rep:.8}];
 const KNIFE=22,FRAG=20,BIGBITE=21,VACUUM=23,NUKE=26,SUBW=27;
 const isGun=i=>i>=0&&i<WEAPONS.length&&i!==4;
-const PRIMARIES=[0,1,2,3,5,6];
+const PRIMARIES=[0,1,2,3,5,6,7];
 const WNAME=i=>i===KNIFE?'Kniv':i===FRAG?'Granat':i===BIGBITE?'BigBite Dagens':i===VACUUM?'Støvsuger':i===24?'Bombe':i===25?'Rakettkaster':i===NUKE?'Atombombe':(WEAPONS[i]?WEAPONS[i].name:'?');
 
 /* ---------------- renderer ---------------- */
@@ -467,13 +467,27 @@ const MAPS={
    solid(0,3,-2.95,6,1,.1,rail,'metal');solid(-.9,3,2.95,4.2,1,.1,rail,'metal');
    solid(2.95,3,1.05,.1,1,3.9,rail,'metal');solid(-2.95,3,-1.05,.1,1,3.9,rail,'metal');
    solid(-1,6,-2.95,4,1,.1,rail,'metal');solid(-2.95,6,-1,.1,1,4,rail,'metal');
-   // flare stack on top
-   const st=new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,7,10),mat(0x5a5650,'metal'));st.position.set(-2.4,9.5,-2.4);st.castShadow=true;BG.add(st);BX.push({t:'c',x:-2.4,z:-2.4,r:.25,mn:[-2.65,6,-2.65],mx:[-2.15,13,-2.15],h:13});
+   // ground floor walls with doors and windows, so the tower reads as a building
+   const wc2=0x8c8478;solid(-1.85,0,-2.8,1.9,2.7,.2,wc2,'concrete');solid(1.85,0,-2.8,1.9,2.7,.2,wc2,'concrete');solid(0,1.9,-2.8,1.8,.8,.2,wc2,'concrete');solid(0,0,-2.8,1.8,.9,.2,wc2,'concrete');
+   solid(-2.1,0,2.8,1.4,2.7,.2,wc2,'concrete');solid(1.7,0,2.8,2.2,2.7,.2,wc2,'concrete');solid(-.4,2.2,2.8,2,.5,.2,wc2,'concrete');
+   // third deck over the second, reached by stairs along the second deck's open side
+   stairs(.4,.4,0,-1,6,5,.54,.6,1,0x77736a);
+   solid(-1.55,8.4,-1,2.9,.3,4,steel,'metal');solid(.4,8.4,-2.65,1,.3,.7,steel,'metal');
+   solid(-1.05,8.7,-2.95,3.9,1,.1,rail,'metal');solid(.95,8.7,-2.65,.1,1,.7,rail,'metal');solid(-2.95,8.7,-1,.1,1,4,rail,'metal');solid(-1.55,8.7,.95,2.9,.5,.1,rail,'metal');
+   for(const[x,z]of[[-2.95,-2.95],[-.15,-2.95],[-2.95,.95],[-.15,.95]])solid(x,6,z,.22,2.4,.22,steel,'metal');
+   // flare stack on the top deck
+   const st=new THREE.Mesh(new THREE.CylinderGeometry(.18,.25,6,10),mat(0x5a5650,'metal'));st.position.set(-2.6,11.7,-2.6);st.castShadow=true;BG.add(st);BX.push({t:'c',x:-2.6,z:-2.6,r:.25,mn:[-2.85,8.7,-2.85],mx:[-2.35,14.7,-2.35],h:14.7});
+   // loading docks along the west and east walls: walk up the steps, low cover along the edge
+   for(const sd of[-1,1]){const x0=sd*20.6,z0=sd<0?-9:-6.3,z1=sd<0?8.2:5.6,H=1.3,ed=x0-sd*1.45;
+     solid(x0,0,(z0+z1)/2,2.9,H,z1-z0,0x8f887c,'concrete');solid(ed,H,(z0+z1)/2,.12,.06,z1-z0,0x6e6a62,'metal',{collide:false});
+     stairs(x0,z0-1.5,0,1,0,3,.44,.6,2.4,0x77736a);stairs(x0,z1+1.5,0,-1,0,3,.44,.6,2.4,0x77736a);
+     const L=z1-z0;for(const f of[.12,.42,.72])solid(ed+sd*.3,H,z0+L*f+L*.08,.6,.9,L*.16,0xb3a27c,'bags');
+     crate(x0+sd*.55,H,z0+L*.6);crate(x0+sd*.55,H,z0+L*.25);crate(x0+sd*.55,H+1.25,z0+L*.25);}
    // tanks
    tank(-15,-14,2.4,5.5,0xd8d2c4);tank(-9,-17.5,1.8,4.2,0xc9c2b2);tank(15.5,15.5,2.2,5,0xd8d2c4);
    // overhead pipe rack (crouch under)
-   pipe('x',-19,4,10,1.75,.42,0x9a8f7a);pipe('x',-19,4,10.9,1.75,.42,0x7f7563);
-   for(let x=-17;x<=3;x+=5){solid(x,0,9.6,.25,1.3,.25,steel,'metal',{collide:false});solid(x,0,11.3,.25,1.3,.25,steel,'metal',{collide:false})}
+   pipe('x',-19,4,10,1.6,.42,0x9a8f7a);pipe('x',-19,4,10.9,1.6,.42,0x7f7563);
+   for(let x=-17;x<=3;x+=5){solid(x,0,9.6,.25,1.16,.25,steel,'metal',{collide:false});solid(x,0,11.3,.25,1.16,.25,steel,'metal',{collide:false})}
    // ground pipe (jump over)
    pipe('z',-18,3,12,.45,.45,0x8c7a5c);
    // pump shack
@@ -487,7 +501,7 @@ const MAPS={
    barrel(6.2,-6.4,0x9a3b2a);barrel(-6.5,8.6,0x2f5c8a);barrel(18.5,-8,0x9a3b2a);barrel(18.5,-7,0x9a3b2a);barrel(-12,18.5,0x2f5c8a);
    container(-17,15.5,false,1,0x7b8a5a);container(18,-12,true,1,0x9b4a33);
   }},
- stackyard:{name:'Containerhavna',blurb:'En havnekasse full av containere. Korte gater, ingen gjemmesteder, totalt kaos.',half:16,
+ stackyard:{name:'Containerhavna',mode:'gg',blurb:'Gun Game. Hvert drap gir deg et nytt våpen, fra Assault via hagler, snipere og revolvere til smørkniven. Første som dreper med smørkniven vinner. Ingen killstreaks.',half:16,
   sky:[0x56708c,0xaab6bf,0x4a4d50],fog:[26,85],ground:0x8f8f8a,groundTex:'concrete',sunPos:[-20,40,-14],sunColor:0xe8eef5,hemi:[0xdde6f0,0x45484a,.85],
   spawns:[[-14.6,-14.6],[14.6,-14.6],[-14.6,14.6],[14.6,14.6],[0,-15.2],[0,15.2],[-15.2,0],[15.2,-1],[-10,-14.6],[2,-14.6],[2,-9.6],[-15.1,-4],[-10.5,-5.6],[12,-10.6],[12,-5.6],[-7,-.6],[-7,4.6],[14.9,2],[9.6,3],[-12,5.5],[-12,10.6],[-4.6,8],[.6,8.2],[6,6.4],[6,11.6],[-6,15.2],[10,15.2],[-1.6,-3.4],[4.6,-.9],[-10,-9.4]],
   build(){
@@ -743,13 +757,16 @@ function camoMat(c){if(!camoMats[c]){const cv=camoCanvas[c]||(camoCanvas[c]=draw
 const ATT={
  rifle:[{id:'reddot',name:'Red Dot',need:3,desc:'Rent 1x rødpunktsikte'},{id:'acog',name:'ACOG',need:8,desc:'4x kikkertsikte med rød vinkel'},{id:'comp',name:'Compensator',need:12,desc:'40 % mindre rekyl'},{id:'sil',name:'Silencer',need:25,desc:'20 % mindre rekyl, stille, skjult på minikartet'},{id:'ext',name:'Extended Mag',need:40,desc:'45 skudd'}],
  smg:[{id:'reddot',name:'Red Dot',need:3,desc:'Rent 1x rødpunktsikte'},{id:'acog',name:'ACOG',need:8,desc:'4x kikkertsikte med rød vinkel'},{id:'rapid',name:'Rapid Fire',need:12,desc:'40 % raskere skyting, 60 % mer rekyl'},{id:'sil',name:'Silencer',need:20,desc:'20 % mindre rekyl, stille, skjult på minikartet'},{id:'ext',name:'Extended Mag',need:35,desc:'48 skudd'}],
- dbl:[{id:'slug',name:'Slug',need:10,desc:''},{id:'sawed',name:'Sawed-off',need:20,desc:''},{id:'thicc',name:'Thicc',need:35,desc:''}],
- shotgun:[{id:'reddot',name:'Red Dot',need:5,desc:'Rent 1x rødpunktsikte'},{id:'slug',name:'Slug',need:10,desc:'Én presis, tung kule: 100 skade mot bryst og hode, enorm rekyl'},{id:'sprett',name:'Sprettkule',need:20,desc:'Hvert skudd kaster deg motsatt vei'},{id:'ext',name:'Extended Tube',need:40,desc:'9 patroner'}],
+ dbl:[{id:'slug',name:'Slug',need:10,desc:''},{id:'sawed',name:'Sawed-off',need:20,desc:''},{id:'thicc',name:'Thicc',need:35,desc:''},{id:'hop',name:'Rekylhopp',need:50,desc:''}],
+ shotgun:[{id:'reddot',name:'Red Dot',need:5,desc:'Rent 1x rødpunktsikte'},{id:'slug',name:'Slug',need:10,desc:'Én presis, tung kule: 100 skade mot bryst og hode, enorm rekyl'},{id:'sprett',name:'Rekylhopp',need:20,desc:'Hvert skudd kaster deg motsatt vei'},{id:'ext',name:'Extended Tube',need:40,desc:'9 patroner'}],
+ fifty:[{id:'rapid',name:'Rapid Fire',need:5,desc:''},{id:'hop',name:'Rekylhopp',need:25,desc:''}],
  sniper:[{id:'iron',name:'Iron Sights',need:5,desc:'Uten kikkert, raskere sikting'},{id:'sil',name:'Silencer',need:15,desc:'20 % mindre rekyl, stille, skjult på minikartet'},{id:'akimbo',name:'Akimbo',need:40,desc:'En snikskytterrifle i hver hånd. Ingen sikting, bare no-scopes'}],
  revolver:[{id:'laser',name:'Lasersikte',need:5,desc:''},{id:'akimbo',name:'Akimbo',need:15,desc:''},{id:'long',name:'Kjempeløp',need:30,desc:''},{id:'buck',name:'Buckshot',need:45,desc:''}],
  knife:[{id:'bowie',name:'Bowiekniv',need:10,desc:'Lengre rekkevidde, litt tregere'},{id:'sword',name:'Sverd',need:25,desc:'Lang rekkevidde, trege slag'},{id:'axe',name:'Stridsøks',need:50,desc:'Enorm rekkevidde, svært trege slag'}]};
 const attSel=(()=>{const a=store.get('att3',[-1,-1,-1,-1,-1]);return WEAPONS.map((w,i)=>Array.isArray(a)?clamp(num(a[i],-1)|0,-1,ATT[w.id].length-1):-1)})();
-const attOf=i=>attSel[i]>=0?ATT[WEAPONS[i].id][attSel[i]].id:'';
+var GG_ON=false;// set while a Gun Game match is running (read before the gun game code is defined)
+const attOf=i=>GG_ON?ggAttFor(i):attSel[i]>=0?ATT[WEAPONS[i].id][attSel[i]].id:'';
+const attIdxOf=i=>{const a=attOf(i);return a?ATT[WEAPONS[i].id].findIndex(x=>x.id===a):-1};
 const attUnlocked=(i,k)=>camoAll||wk[i]>=ATT[WEAPONS[i].id][k].need;
 const MELEE={'':{name:'Smørkniv',reach:2.1,swing:.38,speed:1.12},bowie:{name:'Bowiekniv',reach:2.7,swing:.52,speed:1.08},sword:{name:'Sverd',reach:3.5,swing:.75,speed:1.0},axe:{name:'Stridsøks',reach:4.4,swing:1.05,speed:.9}};
 function effW(i){const b=WEAPONS[i],a=attOf(i);const w=Object.assign({},b,{att:a,range:b.range.slice(),dmg:b.dmg.slice()});
@@ -767,6 +784,8 @@ function effW(i){const b=WEAPONS[i],a=attOf(i);const w=Object.assign({},b,{att:a
   if(a==='long'){w.dmg=[110,110];w.range=[30,90];w.rpm=50;w.recoil=.15;w.head=1;w.fov=20;w.scope=true;w.wallbang=true;w.ads=0;w.adsTime=.26;w.speed=1.0;w.bigKick=true}
   if(a==='sword'||a==='axe')w.speed=1.0;
   if(b.id==='dbl'&&a==='sawed'){w.speed=b.speed*1.25;w.range=w.range.map(r=>r*.72);w.hip*=1.15;w.ads*=1.2}
+  if(b.id==='fifty'&&a==='rapid')w.auto=true;
+  if(a==='hop'){w.knock=10}
   if(a==='thicc'){w.pellets=1;w.dmg=[100,90];w.range=[45,95];w.hip=.03;w.ads=.002;w.head=1.3;w.mag=1;w.reload=1.5;w.recoil=.3;w.bigKick=true;w.fat=.3}
   if(a==='buck'){w.pellets=6;w.dmg=[20,5];w.range=[5,14];w.hip=.075;w.ads=.045;w.head=1.2;w.recoil=.1;w.snd=WEAPONS[2].snd}
   if(a==='akimbo'){w.akimbo=true;w.noAds=true;w.scope=false;w.mag=b.mag*2;w.hip=b.id==='sniper'?.045:b.id==='revolver'?.03:.04;w.reload*=1.3}
@@ -886,6 +905,23 @@ function gunModel(id,camo=0,att=''){
     else{limb(g,v3(0,.0,.015),v3(0,-.042,.13),.02,.022,wd,16);const st=limb(g,v3(0,-.03,.11),v3(0,-.072,.4),.024,.04,wd,18);
       const bp=cz(g,.041,.014,blk,0,-.073,.405,18);bp.rotation.x=Math.PI/2-.14}
     support=[-.01,fy-.02,z0-.02-fe*.55]}
+  if(id==='fifty'){
+    // heavy semi-auto anti-materiel rifle: long boxy receiver, fluted barrel with a big muzzle brake, top rail and scope, folded bipod
+    const body=CM||mat(0x2b2d2a,'polymer',{r:.62}),dk=CM||mat(0x3a3d36,'gunmetal',{r:.45,m:.6});
+    bx(g,.058,.07,.56,body,0,.008,-.13);bx(g,.05,.03,.42,dk,0,-.035,-.1);bx(g,.02,.012,.56,steel,0,.05,-.13);
+    for(let i=0;i<9;i++)bx(g,.024,.006,.012,blk,0,.059,-.38+i*.06);
+    bx(g,.062,.04,.16,dk,0,.018,-.33);for(let i=0;i<5;i++)bx(g,.064,.012,.014,blk,0,.01,-.27-i*.025);
+    cz(g,.022,.5,blued,0,.012,-.66,18);for(let i=0;i<6;i++)bx(g,.005,.005,.42,blk,Math.cos(i)*.022,.012+Math.sin(i)*.022,-.66);cz(g,.03,.06,dk,0,.012,-.43,18);
+    if(att==='boom')cz(g,.024,.04,mat(0xd23a2a),0,.012,-.89,18);
+    bx(g,.075,.05,.11,met,0,.012,-.955);for(const z of[-.925,-.955,-.985])for(const x of[-.04,.04])bx(g,.012,.034,.014,blk,x,.012,z);tip=-1.01;
+    bx(g,.05,.11,.09,met,0,-.085,-.12);bx(g,.052,.012,.092,blk,0,-.14,-.12);
+    bx(g,.034,.09,.045,body,0,-.07,.06,-.3);const tg=mesh(new THREE.TorusGeometry(.022,.003,8,16,Math.PI),steel,g);tg.rotation.set(0,Math.PI/2,Math.PI);tg.position.set(0,-.032,.0);
+    bx(g,.05,.075,.26,body,0,-.01,.27);bx(g,.046,.03,.14,dk,0,.04,.23);bx(g,.054,.11,.03,blk,0,-.02,.41);bx(g,.02,.05,.04,dk,0,-.075,.3);
+    for(const x of[-.016,.016]){const l=bx(g,.008,.008,.24,steel,x,-.012,-.52);l.rotation.x=.05}
+    if(att==='rapid')bx(g,.06,.01,.05,mat(0xe8c22a,null,{r:.4}),0,.046,.05);
+    cz(g,.021,.24,blued,0,.1,-.12,20);cz(g,.034,.08,blued,0,.1,-.27,24,.021);cz(g,.026,.06,blued,0,.1,.03,24);cz(g,.03,.004,glass,0,.1,-.31,24);
+    cx(g,.015,.04,blued,0,.124,-.12);cx(g,.013,.032,blued,.032,.1,-.12);for(const z of[-.19,-.04])bx(g,.014,.05,.018,met,0,.072,z);
+    sightY=.1;support=[-.01,-.06,-.3]}
   if(id==='knife'){
     const blade=CM||mat(0xd8dcdf,'gunmetal',{r:.16,m:1}),brass=CM||mat(0xb0873a,'gunmetal',{r:.3,m:.95}),grip=CM||wood,leather=mat(0x2b1d14,'polymer',{r:.7});
     if(att===''){bx(g,.004,.022,.13,blade,0,.004,-.105);const t=ball(g,v3(0,.004,-.17),.011,blade,12);t.scale.set(.35,1,1.2);bx(g,.01,.015,.1,blade,0,-.002,.01);bx(g,.012,.017,.02,blade,0,-.002,.065);tip=-.18}
@@ -1348,7 +1384,7 @@ function bombBlast(x,z,by){const p=new V3(x,.5,z);explosionFx(p,false);for(let i
 
 /* ---- per frame on every client ---- */
 let sdPrevNow=0;
-function sdTick(fdt){if(!sdOn()){if(tdmOn()){tdmSettle();sdHud()}return}const dt=sdPrevNow?Math.min(1,Math.max(0,now-sdPrevNow)):fdt;sdPrevNow=now;
+function sdTick(fdt){if(!sdOn()){if(tdmOn()){tdmSettle();sdHud()}else if(ggOn())sdHud();return}const dt=sdPrevNow?Math.min(1,Math.max(0,now-sdPrevNow)):fdt;sdPrevNow=now;
   if(SD&&(SD.ph==='live'||SD.ph==='post')&&(P.spect||!P.alive)&&now-sdDeadReport>3){sdDeadReport=now;sdSend({k:'dead',r:SD.r})}
   if(SD&&!sdIsHost()&&now-sdLastRecv>4&&sdLastRecv>0){const l=sdElect();if(l.length&&l[0]!==findMyPeer())sdStale=l[0];sdLastRecv=now}
   if(sdIsHost())sdHostTick(dt);
@@ -1366,7 +1402,9 @@ function sdTick(fdt){if(!sdOn()){if(tdmOn()){tdmSettle();sdHud()}return}const dt
   if(bombMesh&&SD&&SD.b.st===1){const left=Math.max(0,sdBombDeadline-now);const iv=Math.max(.12,left/SD_FUSE*1.1);bombMesh.userData.led.visible=(now%iv)<iv*.4;
     if(now-sdBeepT>iv){sdBeepT=now;const d=cam.position.distanceTo(bombMesh.position);sTone(1650,.06,.22/(1+d*.08),'square')}}
   sdHud()}
-function sdHud(){const h=$('sdHud');h.hidden=!teamOn();
+function sdHud(){const h=$('sdHud');h.hidden=!(teamOn()||ggOn());
+  if(ggOn()){const rows=roster(),lead=rows[0],N=GG_LADDER.length;$('sdScore').textContent=lead?(lead.me?'Du leder':'Leder: '+lead.name)+' · '+((lead.gl|0)+1)+'/'+N:'';
+    $('sdTime').textContent='Gun Game';$('sdTime').classList.remove('bomb');$('sdRole').textContent='Våpen '+(P.ggLvl+1)+'/'+N+' · '+ggName(P.ggLvl)+(P.ggLvl<N-1?' · neste: '+ggName(P.ggLvl+1):' · drep for å vinne!');$('sdRole').style.color='';return}
   if(tdmOn()){const sc=tdmScore(),el=$('sdScore');el.textContent='';const a=document.createElement('span');a.style.color=TEAMC[0];a.textContent=TEAMN[0]+' '+sc[0];const b=document.createElement('span');b.style.color=TEAMC[1];b.textContent=sc[1]+' '+TEAMN[1];el.append(a,document.createTextNode(' – '),b);
     $('sdTime').textContent='Lagkamp';$('sdTime').classList.remove('bomb');$('sdRole').textContent=myTeam>=0?'Du er på '+TEAMN[myTeam]+' lag':'';$('sdRole').style.color=TEAMC[myTeam]||'';return}if(!sdOn()||!SD){if(sdOn())$('sdTime').textContent='Kobler til…';return}
   const sc=$('sdScore');sc.textContent='';const a=document.createElement('span');a.style.color=TEAMC[0];a.textContent=TEAMN[0]+' '+SD.sc[0];const b=document.createElement('span');b.style.color=TEAMC[1];b.textContent=SD.sc[1]+' '+TEAMN[1];sc.append(a,document.createTextNode(' – '),b);
@@ -1454,7 +1492,7 @@ function kcFrame(dt){if(KC.pending&&now>=KC.pending){if(P.alive)KC.pending=0;els
 /* ---------------- viewmodel ---------------- */
 const vmRoot=new THREE.Group();vmRoot.scale.setScalar(.85);vmScene.add(vmRoot);
 const sleeveM=mat(0x5d6048,'cloth'),gloveM=mat(0x23231f,null,{r:.7}),cuffM=mat(0x2a2c24,null,{r:.8});
-const gripOf=id=>id==='dbl'?v3(0,-.05,.085):id==='revolver'?v3(0,-.06,.05):id==='shotgun'?v3(0,-.035,.15):id==='knife'?v3(0,-.003,.03):id==='pistol'?v3(0,-.075,.03):id==='sniper'?v3(0,-.09,.09):v3(0,-.085,.075);
+const gripOf=id=>id==='fifty'?v3(0,-.075,.07):id==='dbl'?v3(0,-.05,.085):id==='revolver'?v3(0,-.06,.05):id==='shotgun'?v3(0,-.035,.15):id==='knife'?v3(0,-.003,.03):id==='pistol'?v3(0,-.075,.03):id==='sniper'?v3(0,-.09,.09):v3(0,-.085,.075);
 function armTo(parent,from,to,side){limb(parent,from,to.clone().add(v3(side*.02,-.02,.06)),.055,.045,sleeveM,14);limb(parent,to.clone().add(v3(side*.025,-.02,.07)),to.clone().add(v3(side*.02,-.02,.04)),.05,.05,cuffM,14);const h=ball(parent,to,.036,gloveM,14);h.scale.set(1.1,1.2,1.3);return h}
 function noShadow(g){g.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}})}
 function buildGun(i){return buildGunFor(i,camoSel[i],attOf(i))}
@@ -1488,11 +1526,11 @@ function updateLaser(w){const on=w.laser&&P.alive&&!P.holdSub&&P.adsP<.5;laserDo
    3 Frost (target is slowed for 2.5 s). Effect rounds do 10% less direct damage. */
 /* each ammo type unlocks after 20 kills with its weapons (weapon indices: 0 assault, 1 SMG, 2 Hægglo, 3 sniper, 4 knife, 5 revolver);
    once unlocked it works with every gun. 4 Panserbrytende: any gun shoots through up to 1 m of cover. */
-const AMMO=[{name:'Standard',col:'#ece7da',mul:1,req:[],by:''},{name:'Rikosjett',col:'#e8d36a',mul:1,req:[3,5],by:'sniper/revolver'},{name:'Brann',col:'#ff7a2a',mul:.9,req:[2,6],by:'Hægglo/725'},{name:'Frost',col:'#7fd0ff',mul:.9,req:[4],by:'kniv'},{name:'Panserbrytende',col:'#c9ccd2',mul:1,req:[0,1],by:'Assault/SMG'}];
+const AMMO=[{name:'Standard',col:'#ece7da',mul:1,req:[],by:''},{name:'Rikosjett',col:'#e8d36a',mul:1,req:[3,5,7],by:'sniper/revolver/.50 Cal'},{name:'Brann',col:'#ff7a2a',mul:.9,req:[2,6],by:'Hægglo/725'},{name:'Frost',col:'#7fd0ff',mul:.9,req:[4],by:'kniv'},{name:'Panserbrytende',col:'#c9ccd2',mul:1,req:[0,1],by:'Assault/SMG'}];
 const AMMO_NEED=20;
 const ammoProg=i=>AMMO[i].req.reduce((a,w)=>a+(wk[w]||0),0);
 const ammoUnlocked=i=>!AMMO[i].req.length||ammoProg(i)>=AMMO_NEED;
-let ammoSel=clamp(num(store.get('ammo',0))|0,0,4);if(!ammoUnlocked(ammoSel))ammoSel=0;
+const ammoSel=0;// ammo types were removed: always standard rounds
 /* ray against the world returning the hit distance and the surface normal */
 function rayHitN(o,d,maxT){let best=maxT,n=null;if(d[1]<0){const t=-o[1]/d[1];if(t<best){best=t;n=[0,1,0]}}
   for(const b of boxes){if(rayBox(o,d,b.mn,b.mx,best)<0)continue;let t,nn;
@@ -1536,7 +1574,7 @@ const rkVM=(()=>{const g=new THREE.Group();const olive=mat(0x4f5a34,'metal',{r:.
 const STREAKS=[{id:'bigbite',name:'BigBite Dagens',need:3},{id:'booth',name:'Sikkerhetsrom',need:3},{id:'vac',name:'Støvsuger',need:5},{id:'rocket',name:'Rakettkaster',need:5},{id:'dark',name:'Demp lyset',need:7},{id:'atm',name:'Bankomat',need:7}];
 const streakSel=(()=>{const a=store.get('streaks2',{});const v=(id,n,d)=>STREAKS.some(s=>s.id===id&&s.need===n)?id:d;return{s3:v(a&&a.s3,3,'bigbite'),s5:v(a&&a.s5,5,'vac'),s7:v(a&&a.s7,7,'dark')}})();
 const streakKey=s=>s.need===3?'3':s.need===5?'4':'5';
-function grantStreaks(){if(P.streak===25){P.nuke++;popup('Atombombe klar · trykk 6',true);sTone(330,.3,.3,'sawtooth',660);setTimeout(()=>sTone(660,.5,.3,'sawtooth',990),300);return}
+function grantStreaks(){if(ggOn())return;if(P.streak===25){P.nuke++;popup('Atombombe klar · trykk 6',true);sTone(330,.3,.3,'sawtooth',660);setTimeout(()=>sTone(660,.5,.3,'sawtooth',990),300);return}
   const id=P.streak===3?streakSel.s3:P.streak===5?streakSel.s5:P.streak===7?streakSel.s7:null;if(!id)return;const s=STREAKS.find(x=>x.id===id);
   if(id==='bigbite')P.bigbite++;if(id==='booth')P.booth++;if(id==='vac')P.vac++;if(id==='rocket')P.rkt++;if(id==='dark')P.dark++;if(id==='atm')P.atm++;
   popup(s.name+' klar · trykk '+streakKey(s),true);sTone(520,.15,.2,'sine');setTimeout(()=>sTone(780,.2,.2,'sine'),150)}
@@ -1544,21 +1582,19 @@ function grantStreaks(){if(P.streak===25){P.nuke++;popup('Atombombe klar · tryk
 let darkUntil=0,darkK=0,darkBy='';
 function useDark(){if(!P.alive||P.dark<=0||matchOver||sdNoCombat())return;P.dark--;popup('Demp lyset! De andre ser nesten ingenting',true);sTone(180,.6,.3,'sine',60);if(room)safeEmit('dark',{d:15})}
 let darkPrev=0;function darkTick(){const rdt=darkPrev?Math.min(.5,now-darkPrev):0;darkPrev=now;darkK=approach(darkK,now<darkUntil?1:0,rdt/.7);renderer.toneMappingExposure=1.05*(1-.75*darkK);$('darkV').style.opacity=darkK;const t=$('darkT');t.hidden=!(now<darkUntil);if(now<darkUntil)t.textContent=darkBy+' har dempet lyset · '+Math.ceil(darkUntil-now)+' s'}
-function useStreak(n){const id=n===3?streakSel.s3:n===5?streakSel.s5:streakSel.s7;const cnt=()=>P.bigbite+P.booth+P.vac+P.rkt+P.dark+P.atm;const c0=cnt();setTimeout(()=>{if(cnt()<c0&&KS_HATW[id]!=null)rollHat(KS_HATW[id])},0);if(id==='dark')useDark();if(id==='atm')useAtm();if(id==='bigbite')quickSub();if(id==='booth')useBooth();if(id==='vac')useVac();if(id==='rocket')equipRocket()}
+function useStreak(n){if(ggOn())return;const id=n===3?streakSel.s3:n===5?streakSel.s5:streakSel.s7;const cnt=()=>P.bigbite+P.booth+P.vac+P.rkt+P.dark+P.atm;const c0=cnt();setTimeout(()=>{if(cnt()<c0&&KS_HATW[id]!=null)rollHat(KS_HATW[id])},0);if(id==='dark')useDark();if(id==='atm')useAtm();if(id==='bigbite')quickSub();if(id==='booth')useBooth();if(id==='vac')useVac();if(id==='rocket')equipRocket()}
 function renderStreaks(){const g=$('streakGrid');if(!g)return;g.textContent='';
   for(const n of[3,5,7]){const l=document.createElement('div');l.className='wl';l.textContent=n+' drap · tast '+(n===3?'3':n===5?'4':'5');g.appendChild(l);const row=document.createElement('div');row.className='seg';g.appendChild(row);
     for(const s of STREAKS.filter(x=>x.need===n)){const key=n===3?'s3':n===5?'s5':'s7';const b=document.createElement('button');b.className='seg-b';b.setAttribute('aria-pressed',streakSel[key]===s.id);b.textContent=s.name;
       b.onclick=()=>{streakSel[key]=s.id;store.set('streaks2',streakSel);renderStreaks()};row.appendChild(b)}}
   {const l=document.createElement('div');l.className='wl';l.textContent='25 drap · tast 6';g.appendChild(l);const row=document.createElement('div');row.className='seg';const b=document.createElement('button');b.className='seg-b';b.setAttribute('aria-pressed','true');b.textContent='Atombombe';b.title='Avslutter runden for alle';row.appendChild(b);g.appendChild(row)}
-  const a=$('ammoGrid');a.textContent='';AMMO.forEach((m,i)=>{const un=ammoUnlocked(i);const b=document.createElement('button');b.className='seg-b';b.setAttribute('aria-pressed',ammoSel===i);b.textContent=un?m.name:m.name+' · '+Math.min(AMMO_NEED,ammoProg(i))+'/'+AMMO_NEED;b.style.color=un?m.col:'';if(!un)b.style.opacity='.5';b.title=m.req.length?'Låses opp med '+AMMO_NEED+' drap med '+m.by:'';
-    b.onclick=()=>{if(!un){toast(m.name+' låses opp med '+AMMO_NEED+' drap med '+m.by+'. Du har '+ammoProg(i)+'.');return}ammoSel=i;store.set('ammo',i);renderStreaks()};a.appendChild(b)});
-  $('ammoNote').textContent='Rikosjett: 20 drap med sniper/revolver · Brann: 20 med Hægglo/725 · Frost: 20 med kniv · Panserbrytende: 20 med Assault/SMG'}
+}
 
 /* ---------------- Atombombe (25-kill streak) ----------------
    Key 6 sends it. Every client counts down 6 s with a siren, then a mushroom cloud rises in front of each
    player, a white flash and shock wave hit, everyone dies and the round restarts with fresh scores. */
 const NUKE_DELAY=6,NUKE_KILL=1.1,NUKE_OVER=2.4,NUKE_END=9;let nukeState=null;
-function useNuke(){if(!P.alive||P.nuke<=0||nukeState||matchOver)return;if(sdOn()){toast('Atombomben kan ikke brukes i Søk og ødelegg.');return}
+function useNuke(){if(ggOn())return;if(!P.alive||P.nuke<=0||nukeState||matchOver)return;if(sdOn()){toast('Atombomben kan ikke brukes i Søk og ødelegg.');return}
   P.nuke--;safeEmit('nuke',{});startNuke({me:true,peer:findMyPeer(),name:myName,ci:myColor})}
 function startNuke(by){if(nukeState||matchOver)return;nukeState={by,boom:now+NUKE_DELAY,stage:0,next:now};
   popup((by.me?'Du':by.name)+' har sendt en atombombe!',true);$('nukeBy').textContent=(by.me?'Du':by.name)+' fikk 25 drap på rad';$('nukeT').hidden=false}
@@ -1664,9 +1700,34 @@ function updateAtms(dt){atmPull.set(0,0,0);for(let i=atms.length-1;i>=0;i--){con
     if(P.alive&&!P.spect&&!inBooth()&&atmFoe(a)){const dx=a.pos.x-P.pos.x,dz=a.pos.z-P.pos.z,d=Math.hypot(dx,dz);
       if(d<ATM_R&&d>.75){const sp=2.6+6.2*(1-d/ATM_R);atmPull.x+=dx/d*sp;atmPull.z+=dz/d*sp;if(now>a.hum){a.hum=now+.9;sTone(110+(1-d/ATM_R)*120,.5,.12*(1-d/ATM_R)+.04,'sine',90)}}}}}
 
+/* ---------------- Gun Game (Containerhavna) ----------------
+   Every kill moves you one step up the ladder and swaps your weapon on the spot. A kill with the last weapon wins:
+   it is announced on 'ggwin', everyone sees the result and the round restarts from the first weapon. No killstreaks. */
+const GG_LADDER=[[0,''],[1,''],[2,''],[6,''],[6,'thicc'],[3,''],[3,'akimbo'],[7,''],[5,'long'],[5,'akimbo'],[4,'axe'],[4,'sword'],[4,'']];
+const ggOn=()=>GG_ON&&state==='play';
+const ggStage=()=>GG_LADDER[clamp(P.ggLvl|0,0,GG_LADDER.length-1)];
+function ggAttFor(i){const st=ggStage();return st[0]===i?st[1]:''}
+function ggName(l){const[w,a]=GG_LADDER[clamp(l|0,0,GG_LADDER.length-1)];const A=a?ATT[WEAPONS[w].id].find(x=>x.id===a):null;return w===4?(A?A.name:'Smørkniv'):WEAPONS[w].name+(A?' · '+A.name:'')}
+function ggSync(){for(let i=0;i<WEAPONS.length;i++){const k=camoSel[i]+':'+attOf(i);if(GUNS[i].lk!==k)equipChanged(i)}}
+function ggApply(){ggSync();P.primary=ggStage()[0];
+  if(P.alive){P.holdSub=false;P.rkHold=false;P.wi=P.primary;P.ammo[P.wi]=EFF[P.wi].mag;if(P.ammoH)P.ammoH[P.wi]=akMag(P.wi);P.reloadT=0;P.switchT=now+.3;P.adsP=0;P.fireT=0;P.handT=[0,0]}
+  sendPresence(true)}
+function ggEnter(){P.ggLvl=0;P.bigbite=P.booth=P.vac=P.rkt=P.dark=P.atm=P.nuke=P.rockets=0;ggApply()}
+function ggLeave(){GG_ON=false;P.primary=clamp(num(store.get('gun',0))|0,0,WEAPONS.length-1);if(P.primary===4)P.primary=0;ggSync()}
+function ggKill(){if(matchOver)return;
+  if(P.ggLvl>=GG_LADDER.length-1){safeEmit('ggwin',{});ggWin({me:true,peer:findMyPeer(),name:myName,ci:myColor});return}
+  P.ggLvl++;ggApply();popup('Nytt våpen ('+(P.ggLvl+1)+'/'+GG_LADDER.length+'): '+ggName(P.ggLvl),true);sTone(660,.1,.2,'square');setTimeout(()=>sTone(990,.14,.2,'square'),110)}
+function ggWin(by){if(matchOver||!ggOn())return;matchOver={until:now+8,gg:true};kcEnd();const o=$('over');o.textContent='';
+  const h=document.createElement('h2');h.textContent=by.me?'Du vant Gun Game!':by.name+' vant Gun Game';h.style.color=COLORS[by.ci%8];o.appendChild(h);
+  const s=document.createElement('div');s.className='sub';s.textContent=(by.me?'Du':by.name)+' kom gjennom alle '+GG_LADDER.length+' våpnene først. Ny runde starter om noen sekunder.';o.appendChild(s);
+  $('board').hidden=false;renderBoard();const tb=$('board').querySelector('table');if(tb)o.appendChild(tb.cloneNode(true));$('board').hidden=true;o.hidden=false;$('death').hidden=true;
+  if(by.me){sTone(523,.2,.25,'triangle');setTimeout(()=>sTone(659,.2,.25,'triangle'),180);setTimeout(()=>sTone(784,.45,.25,'triangle'),360)}else sTone(220,.4,.25,'triangle')}
+function ggTick(){if(matchOver&&matchOver.gg){$('death').hidden=true;if(now>matchOver.until)ggReset()}}
+function ggReset(){matchOver=null;$('over').hidden=true;$('feed').textContent='';P.kills=P.deaths=P.streak=0;P.ggLvl=0;ggApply();if(state==='play')respawn()}
+
 /* ---------------- player ---------------- */
 const P={pos:new V3(),vel:new V3(),h:H_STAND,eye:1.6,onGround:true,crouch:false,yaw:0,pitch:0,hp:100,alive:false,wi:0,primary:store.get('gun',0),ammo:[],reloadT:0,fireT:0,switchT:0,adsP:0,sprint:false,sprintOutT:0,
-  kills:0,deaths:0,streak:0,shots:0,stillT:0,campK:1,spect:false,sdRound:-1,actT:0,nades:2,bigbite:0,booth:0,boothUntil:0,boothYaw:0,vac:0,rkt:0,dark:0,atm:0,nuke:0,rockets:0,rkHold:false,rkNext:0,burnUntil:0,burnLast:0,slowUntil:0,holdSub:false,subAt:-9,hand:0,handT:[0,0],boltH:[0,0],pumpAt:-9,knockT:0,lastHurt:-9,spawnT:0,knifeT:0,knifeAnim:-9,firedAt:-9,deadAt:0,killer:null,speed:0};
+  kills:0,deaths:0,streak:0,shots:0,stillT:0,campK:1,spect:false,sdRound:-1,actT:0,nades:2,bigbite:0,booth:0,boothUntil:0,boothYaw:0,vac:0,rkt:0,dark:0,atm:0,nuke:0,ggLvl:0,rockets:0,rkHold:false,rkNext:0,burnUntil:0,burnLast:0,slowUntil:0,holdSub:false,subAt:-9,hand:0,handT:[0,0],boltH:[0,0],pumpAt:-9,knockT:0,lastHurt:-9,spawnT:0,knifeT:0,knifeAnim:-9,firedAt:-9,deadAt:0,killer:null,speed:0};
 let myName=String(store.get('name','')||'').replace(/[^\w .\-]/g,'').slice(0,14);
 let myColor=clamp(store.get('color',Math.random()*8|0)|0,0,7);
 let sens=clamp(num(store.get('sens',1),1),.2,3);
@@ -1728,7 +1789,7 @@ function pollPad(dt){let gp=null;try{const l=navigator.getGamepads?navigator.get
   if(pressed(0)){if(!P.alive)tryRespawn();else jumpQ=true}padJumpHeld=!!down[0];
   if(pressed(11)&&P.alive){if(P.crouch)tryStand();else P.crouch=true}
   if(pressed(2))startReload();if(down[2]){keys.KeyE=true;padE=true}else if(padE){keys.KeyE=false;padE=false}
-  if(pressed(3))switchTo(P.wi===4?P.primary:4);
+  if(pressed(3)&&!ggOn())switchTo(P.wi===4?P.primary:4);
   if(pressed(4))useStreak(3);if(pressed(5))useStreak(5);if(pressed(12))useStreak(7);if(pressed(13))useNuke()}
 window.addEventListener('gamepadconnected',()=>{padLast=now;toast('Kontroller tilkoblet · Start åpner menyen')});
 let chatOpen=false;
@@ -1748,14 +1809,14 @@ addEventListener('keydown',e=>{
   if(['Space','KeyQ','KeyG','KeyF'].includes(e.code))e.preventDefault();
   if(e.repeat)return;keys[e.code]=true;
   if(!P.alive){
-    const n={Digit1:0,Digit2:1,Digit3:2,Digit4:3,Digit5:5,Digit6:6}[e.code];if(n!=null){P.primary=n;store.set('gun',n);renderDeath()}
+    const n={Digit1:0,Digit2:1,Digit3:2,Digit4:3,Digit5:5,Digit6:6,Digit7:7}[e.code];if(n!=null&&!ggOn()){P.primary=n;store.set('gun',n);renderDeath()}
     if(e.code==='Space')tryRespawn();return}
   if(e.code==='Space')jumpQ=true;
   if(e.code==='KeyC'||e.code==='ControlLeft'){if(P.crouch)tryStand();else P.crouch=true}
   if(e.code==='KeyR')startReload();
-  if(e.code==='Digit1')switchTo(P.primary);
+  if(!ggOn()){if(e.code==='Digit1')switchTo(P.primary);
   if(e.code==='Digit2')switchTo(4);
-  if(e.code==='KeyQ')switchTo(P.wi===4?P.primary:4);
+  if(e.code==='KeyQ')switchTo(P.wi===4?P.primary:4)}
   if(e.code==='Digit3')useStreak(3);
   if(e.code==='Digit4')useStreak(5);
   if(e.code==='Digit5')useStreak(7);
@@ -1802,11 +1863,12 @@ function tryFire(forceHand){
     const da=[d.x,d.y,d.z],oa=[o.x,o.y,o.z];
     let wt=rayWorld(oa,da,160);let ht=rayTargets(oa,da,wt,targetsForMe(),w.fat||0),wb=false;
     if(ht&&ht.target.boothOn){wt=Math.max(0,ht.t-.4);ht=null;puff(o.clone().addScaledVector(d,wt),0xbfdcef,5,1.4,.35);sTone(2400,.04,.08,'triangle')}
-    if(!ht&&(w.id==='sniper'||w.wallbang||ammoSel===4)){const h2=rayTargets(oa,da,160,targetsForMe());if(h2){const th=solidThickness(oa,da,h2.t);if(th>=0&&th<=(w.id==='sniper'||w.wallbang?WALLBANG_MAX:1)){ht=h2;wb=true;puff(o.clone().addScaledVector(d,wt),0x8a8a80,6,1.6)}}}
+    if(!ht&&(w.id==='sniper'||w.wallbang||ammoSel===4)){const h2=rayTargets(oa,da,160,targetsForMe());if(h2){const th=solidThickness(oa,da,h2.t);if(th>=0&&th<=(w.id==='sniper'||w.wallbang?WALLBANG_MAX:1)*(w.fmj?2.2:1)){ht=h2;wb=true;puff(o.clone().addScaledVector(d,wt),0x8a8a80,6,1.6)}}}
     {const ah=atmRay(oa,da,(ht?ht.t:wt)+.02);if(ah&&atmFoe(ah.a)&&(!ht||wb||ah.t<ht.t)){if(!wb)ht=null;wt=Math.min(wt,ah.t);atmDamage(ah.a,falloff(w,ah.t)*AMMO[ammoSel].mul,true);hitAny=true}}
     const end=o.clone().addScaledVector(d,ht?ht.t:wt);
+    if(w.boom&&(ht||wt<160)){const bp=end.clone().addScaledVector(d,-.15);const r2=v=>Math.round(v*100)/100;safeEmit('xb',{p:[r2(bp.x),r2(bp.y),r2(bp.z)]});explode({pos:bp,mini:true,owner:{me:true,peer:findMyPeer(),name:myName,ci:myColor}})}
     if(p<2&&(P.shots%2===0||w.pellets>1||!w.auto)&&!w.sil)tracer(muzzleW,end);
-    if(ht){hitAny=true;const dmg=falloff(w,ht.t)*(ht.head?w.head:1)*(wb?.95:1)*AMMO[ammoSel].mul;puff(end,ht.target.dummy?0x8a7a60:0x9a1a12,4,1.5);if(dealDamage(ht.target,dmg,P.wi,ht.head,wb,P.adsP<.3,ammoSel))killHit=true;const e=sp.get(ht.target)||{d:0,h:false,p:end.clone()};e.d+=dmg;e.h=e.h||ht.head;sp.set(ht.target,e)}
+    if(ht){hitAny=true;const dmg=falloff(w,ht.t)*(ht.head?w.head:1)*(wb&&!w.fmj?.95:1)*AMMO[ammoSel].mul;puff(end,ht.target.dummy?0x8a7a60:0x9a1a12,4,1.5);if(dealDamage(ht.target,dmg,P.wi,ht.head,wb,P.adsP<.3,ammoSel))killHit=true;const e=sp.get(ht.target)||{d:0,h:false,p:end.clone()};e.d+=dmg;e.h=e.h||ht.head;sp.set(ht.target,e)}
     else if(wt<160){puff(end,curMap.ground,3,1.4,.35);
       if(ammoSel===1){const hn=rayHitN(oa,da,160);if(hn&&hn.t<120){const n=new V3(...hn.n),hp=o.clone().addScaledVector(d,hn.t),rd=d.clone().addScaledVector(n,-2*d.dot(n)).normalize(),st=hp.clone().addScaledVector(n,.03);
         const so=[st.x,st.y,st.z],sd=[rd.x,rd.y,rd.z];const wt2=rayWorld(so,sd,90);const h2=rayTargets(so,sd,wt2,targetsForMe());const e2=st.clone().addScaledVector(rd,h2?h2.t:wt2);tracer(hp,e2,0xffe07a);puff(hp,0xffe07a,3,1.6,.25);
@@ -1870,9 +1932,9 @@ function updateNades(dt){for(let i=nades.length-1;i>=0;i--){const n=nades[i];
   n.m.position.copy(n.pos);n.m.rotation.x+=n.spin.x*dt;n.m.rotation.y+=n.spin.y*dt;n.m.rotation.z+=n.spin.z*dt;n.spin.multiplyScalar(n.pos.y<.3?.9:1);
   if(now>=n.t){scene.remove(n.m);n.m.traverse(o=>{if(o.geometry&&o.geometry!==nadeGeo)o.geometry.dispose()});nades.splice(i,1);explode(n)}}}
 function explode(n){const p=n.pos;explosionFx(p,n.big);if(n.rk)shake=Math.max(shake,.5*(1-Math.min(1,cam.position.distanceTo(p)/25)));const dm=cam.position.distanceTo(p);boomSound(dm*(n.big?.6:1));
-  const RAD=n.big?11:n.rk?5.5:6.5,BASE=n.big?260:n.rk?230:170;const from=p.clone();from.y+=.25;
+  const RAD=n.mini?3.2:n.big?11:n.rk?5.5:6.5,BASE=n.mini?75:n.big?260:n.rk?230:170;const from=p.clone();from.y+=.25;
   const dmgAt=(t)=>{const c=t.pos.clone();c.y+=.9;const d=c.distanceTo(p);if(d>RAD||!los(from,c))return 0;return BASE*Math.pow(1-d/RAD,1.1)};
-  if(P.alive&&!matchOver){const d=dmgAt(P);if(d>0)hurtMe(d,n.owner,n.big?BIGBITE:n.rk?ROCKET:FRAG,false)}
+  if(P.alive&&!matchOver){const d=dmgAt(P);if(d>0)hurtMe(d,n.owner,n.mini?7:n.big?BIGBITE:n.rk?ROCKET:FRAG,false)}
   if(n.owner&&n.owner.me)for(const a of[...atms]){if(!atmFoe(a))continue;const c=a.pos.clone();c.y=1;const d=c.distanceTo(p);if(d<RAD)atmDamage(a,BASE*Math.pow(1-d/RAD,1.1),true)}
   if(n.owner&&n.owner.me){let any=false,kill=false;for(const t of targetsForMe()){if(!t.alive||t.boothOn)continue;const d=dmgAt(t);if(d<=0)continue;any=true;const c=t.pos.clone();c.y+=1.2;splat(c,d,false);if(t.dummy)t.hitAt=now;else if(t.hpGuess!=null&&t.hpGuess-d<=0)kill=true}if(any)hitmarker(kill)}
   if(dm<10)shake=Math.max(shake,.6*(1-dm/10))}
@@ -1886,11 +1948,11 @@ function die(att,wi,head,wb,ns){P.alive=false;P.hp=0;P.deaths++;P.streak=0;P.dea
   const self=!att||att.me;
   safeEmit('kill',{k:self?myPeer:(att.peer||null),w:wi|0,h:head?1:0,b:wb?1:0,n:ns&&isGun(wi)?1:0});
   sendPresence(true);renderDeath();$('death').hidden=false;if(sdLive()){P.deadSD=true;sdDeadReport=0}if(wi!==NUKE)kcQueue(att,wi)}
-function onMyKill(vName,head,wb,wi,ns){const ammoBefore=AMMO.map((m,i)=>ammoUnlocked(i));setTimeout(()=>AMMO.forEach((m,i)=>{if(!ammoBefore[i]&&ammoUnlocked(i)){popup(m.name+'-ammo låst opp',true);chatLine(null,0,m.name+'-ammunisjon er låst opp. Velg den i menyen (Esc).',true)}}),0);P.kills++;P.streak++;popup(head?'Headshot':'+1 drap '+vName,false);if(wb)popup('Wallbang',true);if(ns)popup('Noscope',true);if(wi<=5)rollHat(wi);
+function onMyKill(vName,head,wb,wi,ns){P.kills++;P.streak++;popup(head?'Headshot':'+1 drap '+vName,false);if(wb)popup('Wallbang',true);if(ns)popup('Noscope',true);if(wi<=5)rollHat(wi);
   if(wi>=0&&wi<WEAPONS.length){wk[wi]++;store.set('wk',wk);const A=ATT[WEAPONS[wi].id].find(a=>a.need===wk[wi]);if(A&&!camoAll){popup(A.name+' låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+A.name+' til '+WEAPONS[wi].name+'. Utstyr det i menyen (Esc).',true)}}
   if(wi>=0&&wi<WEAPONS.length&&WEAPONS[wi].melee){const u=CAMOS.find(c=>c.need===wk[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · Kniv',true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til kniven. Utstyr den i menyen (Esc).',true)}}
   if(head&&wi>=0&&wi<WEAPONS.length&&!WEAPONS[wi].melee){hs[wi]++;store.set('hs',hs);const u=CAMOS.find(c=>c.need===hs[wi]);if(u&&!camoAll){popup(u.name+'-kamuflasje låst opp · '+WEAPONS[wi].name,true);chatLine(null,0,'Låste opp '+u.name+'-kamuflasje til '+WEAPONS[wi].name+'. Utstyr den i menyen (Esc).',true)}}
-  grantStreaks();
+  grantStreaks();if(ggOn())ggKill();
   if(P.streak===10)popup('10 drap på rad · urørlig',true);else if(P.streak%5===0)popup(P.streak+' drap på rad',true);
   sendPresence(true)}
 function tryRespawn(){if(KC.active){kcEnd();P.deadAt=Math.min(P.deadAt,now-4);return}if(P.alive||now-P.deadAt<1.8||matchOver||sdLive()||KC.pending)return;respawn()}
@@ -1911,7 +1973,7 @@ function safeEmit(topic,data){if(!room)return;room.emit(topic,data).catch(e=>{if
 function queueHit(peer,dmg,wi,head,wb,ns,am){if(!peer)return;const h=pendingHits.get(peer)||{d:0,w:wi,h:0,b:0,n:0,a:0};if(am===2||am===3)h.a=am;h.d+=dmg;h.w=wi;if(head)h.h=1;if(wb)h.b=1;h.n=ns&&isGun(wi)?1:0;pendingHits.set(peer,h)}
 function flushHits(){if(!pendingHits.size||now-lastFlush<.09)return;lastFlush=now;for(const[peer,h]of pendingHits)safeEmit('hit',{t:peer,d:Math.round(h.d),w:h.w,h:h.h,b:h.b,n:h.n,a:h.a});pendingHits.clear()}
 function sendPresence(force){if(!room||(!force&&now-lastPres<.05))return;lastPres=now;const r2=v=>Math.round(v*100)/100;
-  room.presence({n:myName,c:myColor,p:[r2(P.pos.x),r2(P.pos.y),r2(P.pos.z)],y:Math.round(P.yaw*1000)/1000,x:Math.round(P.pitch*1000)/1000,cr:P.crouch?1:0,w:P.holdSub?SUBW:P.wi,cm:camoSel[P.wi],at:attSel[P.wi],ht:hatIdx(),bo:inBooth()?1:0,tm:myTeam,sp:P.spect?1:0,ck:Math.round(P.campK*100)/100,fx:now<P.burnUntil?1:now<P.slowUntil?2:0,vac:myVacState(),byw:Math.round(P.boothYaw*100)/100,sl:EFF[P.wi].sil?1:0,ad:Math.round(P.adsP*10)/10,hb:Math.floor(now*2)%1000,a:P.alive?1:0,k:P.kills,d:P.deaths,s:P.streak,f:P.shots,sp:Math.round(P.speed*10)/10}).catch(()=>{})}
+  room.presence({n:myName,c:myColor,p:[r2(P.pos.x),r2(P.pos.y),r2(P.pos.z)],y:Math.round(P.yaw*1000)/1000,x:Math.round(P.pitch*1000)/1000,cr:P.crouch?1:0,w:P.holdSub?SUBW:P.wi,cm:camoSel[P.wi],at:attIdxOf(P.wi),gl:P.ggLvl|0,ht:hatIdx(),bo:inBooth()?1:0,tm:myTeam,sp:P.spect?1:0,ck:Math.round(P.campK*100)/100,fx:now<P.burnUntil?1:now<P.slowUntil?2:0,vac:myVacState(),byw:Math.round(P.boothYaw*100)/100,sl:EFF[P.wi].sil?1:0,ad:Math.round(P.adsP*10)/10,hb:Math.floor(now*2)%1000,a:P.alive?1:0,k:P.kills,d:P.deaths,s:P.streak,f:P.shots,sp:Math.round(P.speed*10)/10}).catch(()=>{})}
 function findMyPeer(){if(myPeer||!lobby)return myPeer;const me=lobby.peers().find(p=>p.sameTab);if(me)myPeer=me.peer;return myPeer}
 /* Self-hosted networking: when KontorLAN is served by its own server (no claude.ai viewer around it),
    the same room API is provided over a WebSocket to that server. */
@@ -1973,6 +2035,8 @@ async function joinRoom(key){
   rm.on('sd',m=>{if(m.sameTab)return;if(sdStale===m.peer)sdStale=null;if(sdIsHost()&&m.peer>findMyPeer())return;sdLastRecv=now;sdHostState=null;sdApply(m.data)});
   rm.on('sdev',m=>{if(m.sameTab||!sdIsHost())return;sdHostEvent(m.peer,m.data)});
   rm.on('rkt',m=>{if(m.sameTab)return;const d=m.data;if(!d||!Array.isArray(d.p)||!Array.isArray(d.v))return;spawnRocket(new V3(...d.p.slice(0,3).map(v=>clamp(num(v),-60,60))),new V3(...d.v.slice(0,3).map(v=>clamp(num(v),-1,1))),{peer:m.peer,name:nameOf(m.peer),ci:colorOf(m.peer)})});
+  rm.on('xb',m=>{if(m.sameTab)return;const d=m.data;if(!d||!Array.isArray(d.p))return;explode({pos:new V3(...d.p.slice(0,3).map(v=>clamp(num(v),-60,60))),mini:true,owner:{peer:m.peer,name:nameOf(m.peer),ci:colorOf(m.peer)}})});
+  rm.on('ggwin',m=>{if(m.sameTab)return;ggWin({peer:m.peer,name:nameOf(m.peer),ci:colorOf(m.peer)})});
   rm.on('nuke',m=>{if(m.sameTab)return;startNuke({peer:m.peer,name:nameOf(m.peer),ci:colorOf(m.peer)})});
   rm.on('atm',m=>{if(m.sameTab)return;const d=m.data;if(!d||typeof d.id!=='string'||!Array.isArray(d.p))return;spawnAtm(d.id.slice(0,48),new V3(clamp(num(d.p[0]),-60,60),0,clamp(num(d.p[1]),-60,60)),num(d.y),{peer:m.peer,name:nameOf(m.peer),ci:colorOf(m.peer)})});
   rm.on('atmhit',m=>{if(m.sameTab)return;const d=m.data;if(!d||typeof d.id!=='string')return;const a=atms.find(x=>x.id===d.id);if(a)atmDamage(a,clamp(num(d.d),0,400),false,nameOf(m.peer))});
@@ -1991,7 +2055,7 @@ function updateRemotes(dt){if(!room)return;const seen=new Set();
     let r=remotes.get(p.peer);
     if(!r||r.name!==name||r.ci!==ci){const keep=r;if(r)disposeSoldier(r.mesh);r={peer:p.peer,name,ci,mesh:makeSoldier(ci,name),pos:keep?keep.pos:new V3(),tgt:new V3(),yaw:0,pitch:0,crouch:false,alive:false,k:0,d:0,s:0,f:null,firedAt:-9,w:0,speed:0,fresh:!keep,seen:keep?keep.seen:now};remotes.set(p.peer,r)}
     r.tgt.set(clamp(num(pr.p[0]),-60,60),clamp(num(pr.p[1]),0,40),clamp(num(pr.p[2]),-60,60));
-    r.yaw=num(pr.y);r.pitch=num(pr.x);r.crouch=pr.cr===1;r.w=num(pr.w)|0;if(r.w!==SUBW&&!(r.w>=0&&r.w<WEAPONS.length))r.w=0;r.cm=clamp(num(pr.cm)|0,0,CAMOS.length-1);r.at=r.w<WEAPONS.length?clamp(num(pr.at,-1)|0,-1,ATT[WEAPONS[r.w].id].length-1):-1;r.sl=pr.sl===1;r.ad=clamp(num(pr.ad,0),0,1);r.ht=clamp(num(pr.ht,-1)|0,-1,HATS.length-1);r.bo=pr.bo===1;r.tm=num(pr.tm,-1)|0;r.sp=pr.sp===1;r.ck=clamp(num(pr.ck,1),1,4);r.fx=pr.fx===1?1:pr.fx===2?2:0;syncRemoteVac(r,pr.vac);r.byw=num(pr.byw);r.boothOn=r.bo&&r.alive;r.k=num(pr.k)|0;r.d=num(pr.d)|0;r.s=num(pr.s)|0;r.speed=num(pr.sp);
+    r.yaw=num(pr.y);r.pitch=num(pr.x);r.crouch=pr.cr===1;r.w=num(pr.w)|0;if(r.w!==SUBW&&!(r.w>=0&&r.w<WEAPONS.length))r.w=0;r.cm=clamp(num(pr.cm)|0,0,CAMOS.length-1);r.at=r.w<WEAPONS.length?clamp(num(pr.at,-1)|0,-1,ATT[WEAPONS[r.w].id].length-1):-1;r.sl=pr.sl===1;r.ad=clamp(num(pr.ad,0),0,1);r.ht=clamp(num(pr.ht,-1)|0,-1,HATS.length-1);r.bo=pr.bo===1;r.tm=num(pr.tm,-1)|0;r.sp=pr.sp===1;r.ck=clamp(num(pr.ck,1),1,4);r.fx=pr.fx===1?1:pr.fx===2?2:0;syncRemoteVac(r,pr.vac);r.byw=num(pr.byw);r.boothOn=r.bo&&r.alive;r.k=num(pr.k)|0;r.gl=clamp(num(pr.gl,0)|0,0,20);r.d=num(pr.d)|0;r.s=num(pr.s)|0;r.speed=num(pr.sp);
     // Ghost players: a tab that was closed, crashed or left in the background keeps its last presence for a
     // while. It stands still and can't die (hits are applied by the victim's own game). Hide it once it stops
     // updating: newer clients send a heartbeat, older ones are judged by their presence not changing at all.
@@ -2019,26 +2083,27 @@ function feed(kName,kc,vName,vc,wi,head,wb,ns){const row=document.createElement(
   if(kName){row.appendChild(sp(kName,kc));const e=document.createElement('em');e.textContent='['+WNAME(wi)+(wb?' · wallbang':'')+(ns?' · noscope':'')+(head?' · hode':'')+']';row.appendChild(e);row.appendChild(sp(vName,vc))}
   else{row.appendChild(sp(vName,vc));const e=document.createElement('em');e.textContent='[selvmål]';row.appendChild(e)}
   const f=$('feed');f.prepend(row);while(f.children.length>6)f.lastChild.remove();setTimeout(()=>row.remove(),6000)}
-function roster(){const me={name:myName,ci:myColor,k:P.kills,d:P.deaths,s:P.streak,me:true,tm:myTeam};
-  const others=[...remotes.values()].filter(r=>!r.stale).map(r=>({name:r.name,ci:r.ci,k:r.k,d:r.d,s:r.s,tm:r.tm}));
-  return[me,...others].sort((a,b)=>b.k-a.k||a.d-b.d)}
+function roster(){const me={name:myName,ci:myColor,k:P.kills,d:P.deaths,s:P.streak,me:true,tm:myTeam,gl:P.ggLvl|0};
+  const others=[...remotes.values()].filter(r=>!r.stale).map(r=>({name:r.name,ci:r.ci,k:r.k,d:r.d,s:r.s,tm:r.tm,gl:r.gl|0}));
+  const gg=ggOn();return[me,...others].sort((a,b)=>(gg?b.gl-a.gl:0)||b.k-a.k||a.d-b.d)}
 function renderBoard(){const b=$('board');const rows=roster();b.textContent='';
   const h=document.createElement('h2');h.textContent=curMap.name;b.appendChild(h);
-  const s=document.createElement('div');s.className='sub';s.textContent=tdmOn()?(()=>{const sc=tdmScore();return'Lagkamp · '+TEAMN[0]+' '+sc[0]+' – '+sc[1]+' '+TEAMN[1]})():sdOn()?'Søk og ødelegg':'Alle mot alle · uendelig runde';b.appendChild(s);
-  const tb=document.createElement('table');tb.innerHTML='<tr><th>Spiller</th><th class="n">Drap</th><th class="n">Dødsfall</th><th class="n">På rad</th></tr>';
+  const s=document.createElement('div');s.className='sub';s.textContent=ggOn()?'Gun Game · første gjennom alle '+GG_LADDER.length+' våpnene vinner':tdmOn()?(()=>{const sc=tdmScore();return'Lagkamp · '+TEAMN[0]+' '+sc[0]+' – '+sc[1]+' '+TEAMN[1]})():sdOn()?'Søk og ødelegg':'Alle mot alle · uendelig runde';b.appendChild(s);
+  const tb=document.createElement('table');tb.innerHTML='<tr><th>Spiller</th><th class="n">Drap</th><th class="n">Dødsfall</th><th class="n">'+(ggOn()?'Våpen':'På rad')+'</th></tr>';
   for(const r of rows){const tr=document.createElement('tr');if(r.me)tr.className='me';const td=document.createElement('td');const dot=document.createElement('span');dot.className='dot';dot.style.background=teamOn()&&r.tm>=0?TEAMC[r.tm]:COLORS[r.ci];td.appendChild(dot);td.appendChild(document.createTextNode(r.name+(r.me?' (deg)':'')+(teamOn()&&r.tm>=0?' · '+TEAMN[r.tm]:'')));tr.appendChild(td);
-    for(const v of[r.k,r.d,r.s]){const c=document.createElement('td');c.className='n';c.textContent=v;tr.appendChild(c)}tb.appendChild(tr)}
+    for(const v of[r.k,r.d,ggOn()?((r.gl|0)+1)+'/'+GG_LADDER.length:r.s]){const c=document.createElement('td');c.className='n';c.textContent=v;tr.appendChild(c)}tb.appendChild(tr)}
   b.appendChild(tb)}
 function renderDeath(){const d=$('death');d.textContent='';const h=document.createElement('h2');
   const k=P.killer;h.textContent=(!k||k.me)?'Selvmål':'Drept av '+k.name;if(k&&!k.me)h.style.color=COLORS[k.ci%8];d.appendChild(h);
   const s=document.createElement('div');s.className='sub';s.textContent='Velg primærvåpen, og gå inn.';d.appendChild(s);
   const pk=document.createElement('div');pk.className='picks';PRIMARIES.forEach((wi,i)=>{const e=document.createElement('span');e.textContent=(i+1)+' · '+WEAPONS[wi].name;if(wi===P.primary)e.className='on';pk.appendChild(e)});d.appendChild(pk);
+  if(ggOn()){s.textContent='Gun Game · våpen '+(P.ggLvl+1)+'/'+GG_LADDER.length+': '+ggName(P.ggLvl);pk.remove()}
   const n=document.createElement('div');n.className='note';n.id='deployNote';d.appendChild(n)}
 function renderScore(){const rows=roster();const lead=rows[0];const sc=$('score');sc.textContent='';
   const line=(label,k,isLead)=>{const r=document.createElement('div');r.className='sc'+(isLead?' lead':'');const a=document.createElement('span');a.textContent=label;const b=document.createElement('div');b.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,k/Math.max(1,lead?lead.k:1)*100)+'%';b.appendChild(i);const c=document.createElement('span');c.textContent=k;r.append(a,b,c);sc.appendChild(r)};
   line('Deg',P.kills,false);if(lead&&!lead.me)line('Leder',lead.k,true);else if(rows[1])line('2.',rows[1].k,true)}
 function updateHUD(dt){const w=EFF[P.wi];
-  if(P.rkHold){$('mag').textContent=P.rockets;$('magMax').textContent='';$('wname').textContent='Rakettkaster'}else{if(w.melee){$('mag').textContent='—';$('magMax').textContent='';$('wname').textContent=w.name+' · rekkevidde '+w.reach.toFixed(1).replace('.',',')+' m'}else{$('mag').textContent=w.akimbo&&P.ammoH&&P.ammoH[P.wi]?P.ammoH[P.wi][1]+' | '+P.ammoH[P.wi][0]:P.ammo[P.wi]??0;$('magMax').textContent='/'+(w.akimbo?w.mag/2:w.mag);$('wname').textContent=w.name+(w.att?' · '+ATT[w.id][attSel[P.wi]].name:'')+(ammoSel&&isGun(P.wi)?' · '+AMMO[ammoSel].name:'')}}
+  if(P.rkHold){$('mag').textContent=P.rockets;$('magMax').textContent='';$('wname').textContent='Rakettkaster'}else{if(w.melee){$('mag').textContent='—';$('magMax').textContent='';$('wname').textContent=w.name+' · rekkevidde '+w.reach.toFixed(1).replace('.',',')+' m'}else{$('mag').textContent=w.akimbo&&P.ammoH&&P.ammoH[P.wi]?P.ammoH[P.wi][1]+' | '+P.ammoH[P.wi][0]:P.ammo[P.wi]??0;$('magMax').textContent='/'+(w.akimbo?w.mag/2:w.mag);$('wname').textContent=w.name+(w.att?' · '+(ATT[w.id].find(x=>x.id===w.att)||{name:''}).name:'')+(ammoSel&&isGun(P.wi)?' · '+AMMO[ammoSel].name:'')}}
   $('nades').textContent=[P.nuke?'Atombombe × '+P.nuke+' [6]':'',P.atm?'Bankomat × '+P.atm+' [5]':'',P.dark?'Demp lyset × '+P.dark+' [5]':'',P.rkt||P.rockets?'Rakettkaster '+(P.rockets?P.rockets+' raketter':'× '+P.rkt)+' [4]':'',P.bigbite?'BigBite Dagens × '+P.bigbite+' [3]':'',P.booth?'Sikkerhetsrom × '+P.booth+' [3]':'',P.vac?'Støvsuger × '+P.vac+' [4]':''].filter(Boolean).join(' · ');
   {const bt=$('boothT');const on=inBooth()&&P.alive;bt.hidden=!on;if(on)bt.textContent='Sikkerhetsrom · '+(P.boothUntil-now).toFixed(1).replace('.',',')+' s · klikk for å gå ut'}
   $('reload').hidden=!(P.reloadT>0&&P.alive);
@@ -2089,8 +2154,9 @@ async function startMatch(key){
   sdReset();
   try{await joinRoom(key)}catch(e){toast('Kunne ikke bli med i kampen. Last inn siden på nytt og prøv igjen.');backToMenu();return}
   if(curMap.mode==='tdm'){state='play';tdmPickTeam();sendPresence(true)}
+  state='play';GG_ON=curMap.mode==='gg';if(GG_ON)ggEnter();else ggLeave();
   state='play';$('menu').hidden=locked();$('inMatch').hidden=false;$('inMatchMap').textContent=curMap.name;renderMenuState();$('hud').hidden=false;$('pause').hidden=true;respawn()}
-async function backToMenu(){sdReset();darkUntil=0;clearNuke();clearAtms();matchOver=null;$('over').hidden=true;kcEnd();KC.hist.length=0;state='menu';P.alive=false;removeDummy();try{document.exitPointerLock()}catch(e){}await leaveRoom();
+async function backToMenu(){sdReset();darkUntil=0;clearNuke();clearAtms();matchOver=null;$('over').hidden=true;state='menu';ggLeave();kcEnd();KC.hist.length=0;state='menu';P.alive=false;removeDummy();try{document.exitPointerLock()}catch(e){}await leaveRoom();
   for(const n of nades)scene.remove(n.m);nades.length=0;while(vacs.length)removeVac(vacs.length-1);for(const r of rockets)scene.remove(r.m);rockets.length=0;$('hud').hidden=true;$('menu').hidden=false;$('inMatch').hidden=true;$('death').hidden=true;$('pause').hidden=true;renderMenuState();renderCounts()}
 $('resumeBtn').onclick=()=>lock();$('leaveBtn').onclick=()=>backToMenu();
 
@@ -2106,14 +2172,14 @@ function renderCounts(){for(const k in MAPS){const el=document.querySelector('[d
   const n=lobby.peers().filter(p=>p.presence&&p.presence.m===k).length;el.textContent=n?('● '+n+' spiller'):'Tomt'}}
 let camoWeapon=P.primary;
 // apply the menu loadout right away: rebuild any gun whose camo/attachment changed and hold the chosen primary
-function applyLoadout(){for(const i of[0,1,2,3,5,6,4]){const k=camoSel[i]+':'+attOf(i);if(GUNS[i].lk!==undefined&&GUNS[i].lk!==k)equipChanged(i);GUNS[i].lk=camoSel[i]+':'+attOf(i)}
-  if(state==='play'&&P.alive&&!P.spect&&P.wi!==4&&P.wi!==P.primary&&!P.holdSub&&!P.rkHold){switchTo(P.primary)}}
+function applyLoadout(){for(const i of[0,1,2,3,5,6,7,4]){const k=camoSel[i]+':'+attOf(i);if(GUNS[i].lk!==undefined&&GUNS[i].lk!==k)equipChanged(i);GUNS[i].lk=camoSel[i]+':'+attOf(i)}
+  if(state==='play'&&!ggOn()&&P.alive&&!P.spect&&P.wi!==4&&P.wi!==P.primary&&!P.holdSub&&!P.rkHold){switchTo(P.primary)}}
 function equipChanged(i){rebuildGun(i);GUNS[i].lk=camoSel[i]+':'+attOf(i);if(state==='play'&&P.alive&&P.ammo)P.ammo[i]=Math.min(P.ammo[i],EFF[i].mag);sendPresence(true)}
 function renderGuns(){const gs=$('guns');gs.textContent='';
-  [0,1,2,3,5,6,4].forEach(i=>{const w=WEAPONS[i];const b=document.createElement('button');b.className='gun'+(i===4?' side':'')+(i===camoWeapon?' custom':'');b.setAttribute('aria-pressed',i===P.primary);
+  [0,1,2,3,5,6,7,4].forEach(i=>{const w=WEAPONS[i];const b=document.createElement('button');b.className='gun'+(i===4?' side':'')+(i===camoWeapon?' custom':'');b.setAttribute('aria-pressed',i===P.primary);
     const t=document.createElement('b');t.textContent=w.name;b.append(t);
     if(i===P.primary){const e=document.createElement('span');e.className='eq';e.textContent='Primær';b.appendChild(e)}
-    b.onclick=()=>{if(i!==4){P.primary=i;store.set('gun',i)}camoWeapon=i;renderCamo();applyLoadout();sendPresence(true)};gs.appendChild(b)})}
+    b.onclick=()=>{if(i!==4&&!ggOn()){P.primary=i;store.set('gun',i)}camoWeapon=i;renderCamo();applyLoadout();sendPresence(true)};gs.appendChild(b)})}
 function renderCamo(){const grid=$('camoGrid');if(!grid)return;renderGuns();grid.textContent='';const W0=WEAPONS[camoWeapon];
   $('customLbl').textContent='Kamuflasje for '+W0.name+(W0.melee?' · låses opp med drap':' · låses opp med hodeskudd');
   CAMOS.forEach((c,k)=>{const b=document.createElement('button');b.className='cmo'+(camoUnlocked(camoWeapon,k)?'':' locked');b.setAttribute('aria-pressed',camoSel[camoWeapon]===k);b.title=c.name+(c.need?' · '+c.need+(WEAPONS[camoWeapon].melee?' drap':' hodeskudd'):'');b.setAttribute('aria-label',b.title);
@@ -2228,7 +2294,7 @@ function frame(t){requestAnimationFrame(frame);const dt=Math.min(.05,(t-last)/10
   if(P.alive&&!matchOver&&(locked()||(padOn()&&$('menu').hidden)))updatePlayer(dt);
   else if(P.alive){P.vel.x*=.8;P.vel.z*=.8;let rem=dt;while(rem>0){const s=Math.min(rem,1/120);moveEntity(P,s);atmStep(s);rem-=s}P.speed=0;P.adsP=approach(P.adsP,0,dt*5)}
   updateRemotes(dt);updateDummy();updateSplats();
-  updateNades(dt);updateVacs();darkTick();updateAtms(dt);nukeTick(dt);updateRockets(dt);statusTick();sdTick(dt);campTick(dt);kcRecord();updateFx(dt);updateView(dt);updateHUD(dt);const inKC=kcFrame(dt);checkMatch();
+  updateNades(dt);updateVacs();darkTick();updateAtms(dt);nukeTick(dt);ggTick();updateRockets(dt);statusTick();sdTick(dt);campTick(dt);kcRecord();updateFx(dt);updateView(dt);updateHUD(dt);const inKC=kcFrame(dt);checkMatch();
   if((++frameN&1)===0)renderer.shadowMap.needsUpdate=true;
   renderer.clear();renderer.render(scene,cam);renderer.clearDepth();renderer.render(vmScene,vmCam);fpsTick(dt)}
 
