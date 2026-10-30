@@ -527,8 +527,10 @@ const MAPS={
    solid(14,0,12,6,3,.2,wc,'concrete');
    solid(11.1,0,7.9,.2,3,1.6,wc,'concrete');solid(11.1,0,11.1,.2,3,1.6,wc,'concrete');solid(11.1,0,9.5,.2,1.1,1.6,wc,'concrete');solid(11.1,2.1,9.5,.2,.9,1.6,wc,'concrete');
    solid(16.9,0,8.1,.2,3,2,wc,'concrete');solid(16.9,0,11.2,.2,3,1.4,wc,'concrete');solid(16.9,2.2,9.85,.2,.8,1.7,wc,'concrete');
-   solid(14,3,8.9,6.4,.2,4.2,0x6d5a40,'metal');solid(13.05,3,11.6,4.5,.2,1.2,0x6d5a40,'metal');solid(16.75,3,11.6,.9,.2,1.2,0x6d5a40,'metal');solid(15.8,3,12.05,1,.2,.3,0x6d5a40,'metal');
-   ladder(15.8,11.85,0,-1,0,3.2,0,-1,false);
+   // roof with a 1.6 x 1.15 m hatch over the ladder, mid-room
+   solid(14,3,8.2,6.4,.2,2.8,0x6d5a40,'metal');solid(12,3,10.175,2.4,.2,1.15,0x6d5a40,'metal');solid(16,3,10.175,2.4,.2,1.15,0x6d5a40,'metal');solid(14,3,11.475,6.4,.2,1.45,0x6d5a40,'metal');
+   solid(14,0,10.85,2,3,.2,wc,'concrete');// free-standing wall the ladder hangs on
+   ladder(14,10.68,0,-1,0,3.2,0,1,false);
    // cover
    crate(7.5,0,-8);crate(8.8,0,-8.2);crate(8.1,1.25,-8.1);crate(-8,0,7);crate(-8.3,0,5.7);
    crate(-15.5,0,1);crate(-15.5,0,-.3);crate(-15.5,1.25,.35);crate(17,0,-3);crate(-3,0,15.5);crate(-1.7,0,15.8);crate(4,0,-15.5);crate(4,1.25,-15.5);
@@ -913,7 +915,7 @@ function gunModel(id,camo=0,att=''){
     const ham=bx(g,.008,.016,.012,steel,0,.047,.034,-.6);
     const tg=mesh(new THREE.TorusGeometry(.019,.003,8,16,Math.PI),ch,g);tg.rotation.set(0,Math.PI/2,Math.PI);tg.position.set(0,-.014,0);bx(g,.004,.018,.004,steel,0,-.014,-.004);
     const gr=bx(g,.028,.09,.04,wd,0,-.05,.045,-.35);bx(g,.03,.012,.044,ch,0,-.093,.06,-.35);
-    if(att==='laser'){bx(g,.022,.022,.06,blk,0,-.002,-.13);const lz=cz(g,.006,.004,GLOW,0,-.002,-.161,10)}
+    if(att==='laser'){bx(g,.022,.022,.06,blk,0,-.002,-.13);const lz=cz(g,.006,.004,GLOW,0,-.002,-.161,10);lz.userData.keep=true;lz.userData.laserTip=true}
     sightY=.064;
     if(att==='long'){// sniper scope on rings over the frame
       const sy=.104;cz(g,.017,.2,blued,0,sy,-.06,20);cz(g,.027,.07,blued,0,sy,-.19,24,.017);cz(g,.022,.06,blued,0,sy,.065,24);cz(g,.023,.004,glass,0,sy,-.226,24);cz(g,.02,.004,glass,0,sy,.096,24);
@@ -1759,10 +1761,16 @@ const muzzle=new THREE.Mesh(new THREE.PlaneGeometry(.22,.22),new THREE.MeshBasic
 let vmKick=0,muzzleT=0,walkPh=0;
 const laserDot=new THREE.Mesh(new THREE.SphereGeometry(.04,12,8),new THREE.MeshBasicMaterial({color:0xff2a1a,toneMapped:false,fog:false}));laserDot.visible=false;scene.add(laserDot);
 const laserBeam=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(),new V3(0,0,-1)]),new THREE.LineBasicMaterial({color:0xff2a1a,transparent:true,opacity:.85,toneMapped:false,fog:false}));laserBeam.visible=false;laserBeam.frustumCulled=false;scene.add(laserBeam);
-function updateLaser(w){const on=w.laser&&P.alive&&!P.holdSub&&P.adsP<.5;laserDot.visible=laserBeam.visible=on;if(!on)return;
+const _lzW=new V3(),_lzQ=new V3();
+function laserFrom(G){if(G&&G.laserTip===undefined){G.laserTip=null;G.g.traverse(o=>{if(o.userData.laserTip)G.laserTip=o})}
+  const lt=G&&G.laserTip;if(!lt||!G.g.visible)return null;vmRoot.updateMatrixWorld(true);vmCam.updateMatrixWorld();cam.updateMatrixWorld();
+  lt.localToWorld(_lzW.set(0,-.003,0));_lzW.project(vmCam);if(_lzW.z>1)return null;
+  _lzQ.set(_lzW.x,_lzW.y,.5).unproject(cam).sub(cam.position).normalize();const k=.35/Math.max(.2,_lzQ.dot(_f));
+  return cam.position.clone().addScaledVector(_lzQ,k)}
+function updateLaser(w,G){const on=w.laser&&P.alive&&!P.holdSub&&P.adsP<.5&&!(typeof KC!=='undefined'&&KC.active)&&!matchOver;laserDot.visible=laserBeam.visible=on;if(!on)return;
   camBasis();const o=[cam.position.x,cam.position.y,cam.position.z],d=[_f.x,_f.y,_f.z];let t=rayWorld(o,d,90);const ht=rayTargets(o,d,t,targetsForMe());if(ht)t=ht.t;
   const hit=cam.position.clone().addScaledVector(_f,t-.03);laserDot.position.copy(hit);laserDot.scale.setScalar(Math.max(.7,t*.07));
-  const from=cam.position.clone().addScaledVector(_f,.42).addScaledVector(_r,.13).addScaledVector(_u,-.13);const pa=laserBeam.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,hit.x,hit.y,hit.z);pa.needsUpdate=true}const vmKickH=[0,0];
+  const from=laserFrom(G)||cam.position.clone().addScaledVector(_f,.42).addScaledVector(_r,.13).addScaledVector(_u,-.13);const pa=laserBeam.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,hit.x,hit.y,hit.z);pa.needsUpdate=true}const vmKickH=[0,0];
 /* ---------------- ammo types ----------------
    0 Standard · 1 Rikosjett (a miss bounces once off the surface it hits) · 2 Brann (target burns for 3 s)
    3 Frost (target is slowed for 2.5 s). Effect rounds do 10% less direct damage. */
@@ -2213,7 +2221,7 @@ let shake=0;
 function hurtMe(dmg,att,wi,head,wb,ns,am){if(!P.alive||matchOver||now-P.spawnT<.6||inBooth()||P.spect)return;
   if(teamOn()&&wi!==BOMB&&wi!==NUKE&&att&&att.peer&&myTeam>=0&&teamOfPeer(att.peer)===myTeam&&att.peer!==findMyPeer())return;P.hp-=dmg;P.lastHurt=now;shake=Math.max(shake,.12);sTone(180,.12,.25,'sawtooth',90);
   if(P.hp<=0)die(att,wi,head,wb,ns);else if(am)applyAmmoFx(am,att,wi)}
-function die(att,wi,head,wb,ns){P.alive=false;P.hp=0;P.deaths++;P.streak=0;P.deadAt=now;P.killer=att;P.reloadT=0;mouseDown=false;
+function die(att,wi,head,wb,ns){P.alive=false;laserDot.visible=laserBeam.visible=false;P.hp=0;P.deaths++;P.streak=0;P.deadAt=now;P.killer=att;P.reloadT=0;mouseDown=false;
   const self=!att||att.me;
   safeEmit('kill',{k:self?myPeer:(att.peer||null),w:wi|0,h:head?1:0,b:wb?1:0,n:ns&&isGun(wi)?1:0});
   sendPresence(true);renderDeath();$('death').hidden=false;if(sdLive()){P.deadSD=true;sdDeadReport=0}if(wi!==NUKE)kcQueue(att,wi)}
@@ -2589,14 +2597,14 @@ function updateView(dt){const w=EFF[P.wi];
     if(I.cyl){if(t>I.cyl[0]&&t<I.cyl[1]){if(G.cyl)G.cyl.rotation.z+=.6;if(G.cyls)G.cyls.forEach(c=>{if(c)c.rotation.z+=.6})}}}}
   if(subVM.visible){const ta=now-P.subAt;const k=ta>0&&ta<.26?Math.sin(ta/.26*Math.PI):0;const raise=now<P.switchT?(P.switchT-now)/.3:0;subVM.position.set(.2-k*.1,-.2-raise*.2+k*.08+Math.abs(Math.cos(walkPh))*.01*bob,-.46-k*.25);subVM.rotation.set(-.15-k*.6,.15,.1)}
   if(myBooth||inBooth()){if(!myBooth)myBooth=makeBooth();animBooth(myBooth,inBooth()&&P.alive,P.pos,P.boothYaw,dt)}
-  updateLaser(w);
+  updateLaser(w,G);
   muzzle.visible=now<muzzleT&&P.alive&&!P.holdSub;if(muzzle.visible){const mx=G.akimbo?(P.lastHand?-.19:.19):0;muzzle.position.set(x+mx,y+.01,z+G.tip);muzzle.rotation.z=Math.random()*3;muzzle.scale.setScalar(rand(.28,.4)*(1-.75*P.adsP));muzzle.material.opacity=.55*(1-.7*P.adsP)}
 }
 let fpsF=0,fpsShow=0;function fpsTick(){fpsF++;const el=now-fpsShow;if(el>=.5){$('fps').textContent=Math.round(fpsF/el)+' FPS';fpsF=0;fpsShow=now}}
 let last=0,orbit=0,fpsAcc=0,fpsN=0,fpsT=0,pr=Math.min(window.devicePixelRatio||1,2);const PR_MAX=pr;
 function autoRes(dt){fpsAcc+=dt;fpsN++;if(now-fpsT<2)return;const fps=fpsN/fpsAcc;fpsAcc=0;fpsN=0;fpsT=now;let n=pr;if(fps<45&&pr>.75)n=Math.max(.75,pr-.25);else if(fps>58&&pr<PR_MAX)n=Math.min(PR_MAX,pr+.25);if(n!==pr){pr=n;renderer.setPixelRatio(pr);resize()}}
 function frame(t){requestAnimationFrame(frame);const dt=Math.min(.05,(t-last)/1000||0);last=t;now=t/1000;autoRes(dt);GLIT.value=now;
-  if(state==='menu'){orbit+=dt*.06;if(!curMap)setMap('refinery');const r=curMap.half*1.25;cam.fov=60;cam.updateProjectionMatrix();cam.position.set(Math.sin(orbit)*r,curMap.half*.55,Math.cos(orbit)*r);cam.rotation.set(0,0,0);cam.lookAt(0,1.5,0);
+  if(state==='menu'){laserDot.visible=laserBeam.visible=false;orbit+=dt*.06;if(!curMap)setMap('refinery');const r=curMap.half*1.25;cam.fov=60;cam.updateProjectionMatrix();cam.position.set(Math.sin(orbit)*r,curMap.half*.55,Math.cos(orbit)*r);cam.rotation.set(0,0,0);cam.lookAt(0,1.5,0);
     if(((now*2)|0)!==((now-dt)*2|0))renderCounts();
     if((++frameN&3)===0)renderer.shadowMap.needsUpdate=true;renderer.clear();renderer.render(scene,cam);return}
   pollPad(dt);
