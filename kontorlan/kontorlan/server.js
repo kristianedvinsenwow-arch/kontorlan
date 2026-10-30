@@ -5,15 +5,25 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
 const PORT = Number(process.env.PORT) || 8080;
 const PUB = path.join(__dirname, 'public');
+// Version id = hash of index.html. Clients compare it with the version they loaded and reload themselves when it
+// changes (after a new deploy, or when index.html is replaced while the server runs).
+let VERSION = '';
+function computeVersion() {
+  try { VERSION = crypto.createHash('sha1').update(fs.readFileSync(path.join(PUB, 'index.html'))).digest('hex').slice(0, 12); }
+  catch (e) { VERSION = String(Date.now()); }
+}
+computeVersion();
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png', '.css': 'text/css', '.ico': 'image/x-icon' };
 
 const server = http.createServer((req, res) => {
   let p = '/';
   try { p = decodeURIComponent(req.url.split('?')[0]); } catch (e) { res.writeHead(400); return res.end(); }
+  if (p === '/version') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ v: VERSION })); }
   if (p === '/') p = '/index.html';
   const file = path.normalize(path.join(PUB, p));
   if (!file.startsWith(PUB + path.sep)) { res.writeHead(403); return res.end(); }
@@ -42,7 +52,7 @@ wss.on('connection', (ws) => {
   ws.joined = new Set();
   ws.alive = true;
   ws.on('pong', () => { ws.alive = true; });
-  ws.send(JSON.stringify({ t: 'hello', id }));
+  ws.send(JSON.stringify({ t: 'hello', id, v: VERSION }));
 
   // simple token bucket: about 60 messages a second, bursts up to 90
   let budget = 90, last = Date.now();
@@ -88,6 +98,18 @@ wss.on('connection', (ws) => {
   }
   ws.on('close', () => { for (const name of [...ws.joined]) leave(name); });
 });
+
+// notice a replaced index.html (LAN use: copy in the new file, no restart needed) and tell everyone
+let verTimer = null;
+try {
+  fs.watch(PUB, { persistent: false }, () => {
+    clearTimeout(verTimer);
+    verTimer = setTimeout(() => {
+      const old = VERSION; computeVersion();
+      if (old !== VERSION) { const s = JSON.stringify({ t: 'ver', v: VERSION }); for (const c of wss.clients) if (c.readyState === 1) c.send(s); }
+    }, 800);
+  });
+} catch (e) { /* file watching not available: clients still pick up the new version on reconnect */ }
 
 // drop connections that stop answering
 setInterval(() => {
