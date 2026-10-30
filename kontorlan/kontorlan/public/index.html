@@ -102,8 +102,9 @@ label.chk{display:flex;align-items:center;gap:8px;text-transform:none;letter-spa
 /* ---------- HUD ---------- */
 #hud{position:fixed;inset:0;pointer-events:none;user-select:none}
 #hud.kc>*:not(#feed){visibility:hidden}
-#hud.kc>#scope{visibility:visible}
+#hud.kc>#scope,#hud.kc>#hitm{visibility:visible}
 #kc{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between}
+#kcDmg{position:absolute;inset:0;overflow:hidden}.kcn{position:absolute;left:0;top:0;font:800 22px/1 system-ui,sans-serif;color:#fff;text-shadow:0 2px 0 #000,0 0 6px rgba(0,0,0,.8);white-space:nowrap}.kcn.hs{color:#ffd23f;font-size:26px}.kcn.hs::after{content:' ✦';font-size:.7em}.kcn.kill{color:#ff4b3a;font-size:28px}
 .kcbar{background:rgba(0,0,0,.82);padding:12px max(16px,env(safe-area-inset-left,0px));display:flex;align-items:center;gap:14px;font:600 12px var(--mono);color:var(--fg);letter-spacing:.04em}
 .kcbar.top{min-height:44px}.kcbar.bot{min-height:40px;justify-content:space-between;color:var(--muted)}
 .kct{font:800 20px var(--display);text-transform:uppercase;color:var(--red);letter-spacing:.06em}.kcbar b{color:var(--amber)}
@@ -280,7 +281,7 @@ label.chk{display:flex;align-items:center;gap:8px;text-transform:none;letter-spa
   <div id="nukeT" hidden><b>NUKE INCOMING</b><span id="nukeS">6</span><small id="nukeBy"></small></div>
 </div>
 <div id="chat"><div id="chatLog" aria-live="polite"></div><input id="chatIn" maxlength="120" autocomplete="off" spellcheck="false" placeholder="Si noe · Enter sender · Esc avbryter" hidden></div>
-<div id="kc" hidden><div class="kcbar top"><span class="kct">Killcam</span><span>Drept av <b id="kcName"></b> · <span id="kcWep"></span></span></div><div class="kcbar bot"><div class="kcp"><i id="kcBar"></i></div><span>Mellomrom / klikk for å hoppe over</span></div></div>
+<div id="kc" hidden><div id="kcDmg"></div><div class="kcbar top"><span class="kct">Killcam</span><span>Drept av <b id="kcName"></b> · <span id="kcWep"></span></span></div><div class="kcbar bot"><div class="kcp"><i id="kcBar"></i></div><span>Mellomrom / klikk for å hoppe over</span></div></div>
 <div id="toast"></div>
 
 <script src="three.min.js"></script>
@@ -1679,16 +1680,26 @@ const KC={hist:[],last:0,active:false,pending:0,start:0,from:0,to:0,killer:null,
 let kcOn=store.get('killcam',true)!==false;
 const KC_LEN=4,KC_TAIL=.7,KC_DELAY=.7;
 function kcRecord(){if(state!=='play'||now-KC.last<.05)return;KC.last=now;
-  const rs={};for(const[k,r]of remotes)rs[k]=[r.pos.x,r.pos.y,r.pos.z,r.yaw,r.pitch,r.crouch?1:0,r.w|0,r.alive?1:0,num(r.f,0),r.speed||0,r.ad||0];
+  const rs={};for(const[k,r]of remotes)rs[k]=[r.pos.x,r.pos.y,r.pos.z,r.yaw,r.pitch,r.crouch?1:0,r.w|0,r.alive?1:0,num(r.f,0),r.speed||0,r.ad||0,r.ik?now-r.inT0:-1,r.ik|0];
   KC.hist.push({t:now,me:[P.pos.x,P.pos.y,P.pos.z,P.yaw,P.pitch,P.crouch?1:0,P.wi,P.alive?1:0,P.shots,P.speed||0],rs});
   while(KC.hist.length&&KC.hist[0].t<now-7)KC.hist.shift()}
 function kcQueue(att,wi){if(!kcOn||!att||att.me||!att.peer||!remotes.has(att.peer)||KC.hist.length<4)return;KC.pending=now+KC_DELAY;KC.killer=att.peer;KC.name=att.name||nameOf(att.peer);KC.wi=wi}
-function kcStart(){KC.pending=0;KC.active=true;KC.start=now;KC.to=P.deadAt+KC_TAIL;KC.from=Math.max(KC.hist[0].t,P.deadAt-KC_LEN);KC.lastF=null;
+function kcStart(){KC.pending=0;KC.active=true;KC.start=now;KC.dmgT=-1e9;KC.nums=[];$('kcDmg').textContent='';KC.to=P.deadAt+KC_TAIL;KC.from=Math.max(KC.hist[0].t,P.deadAt-KC_LEN);KC.lastF=null;
   if(!KC.ghost){KC.ghost=makeSoldier(myColor,myName);setSoldierHat(KC.ghost,hatIdx())}KC.ghost.g.visible=true;
   $('death').hidden=true;$('kc').hidden=false;$('hud').classList.add('kc');$('kcName').textContent=KC.name;$('kcWep').textContent=WNAME(KC.wi)}
-function kcEnd(){if(!KC.active&&!KC.pending)return;KC.active=false;KC.pending=0;if(KC.vm)KC.vm.g.visible=false;subVM.visible=false;muzzle.visible=false;$('scope').hidden=true;if(KC.ghost){KC.ghost.g.rotation.x=0;KC.ghost.g.rotation.z=0}$('kc').hidden=true;$('hud').classList.remove('kc');if(KC.ghost)KC.ghost.g.visible=false;
+function kcEnd(){if(!KC.active&&!KC.pending)return;KC.active=false;KC.pending=0;laserDot.visible=laserBeam.visible=false;KC.insp=null;$('kcDmg').textContent='';KC.nums=[];if(KC.vm)KC.vm.g.visible=false;subVM.visible=false;muzzle.visible=false;$('scope').hidden=true;if(KC.ghost){KC.ghost.g.rotation.x=0;KC.ghost.g.rotation.z=0}$('kc').hidden=true;$('hud').classList.remove('kc');if(KC.ghost)KC.ghost.g.visible=false;
   if(!P.alive&&!sdLive()){$('death').hidden=false;renderDeath()}}
 const kcBusy=()=>KC.active||KC.pending>0;
+// damage you took, replayed as numbers over your stand-in when the killer's hits land
+const hurtLog=[];
+function kcDamage(t){const prev=KC.dmgT<-1e8?KC.from-.01:KC.dmgT;KC.dmgT=t;
+  for(const h of hurtLog)if(h.peer===KC.killer&&h.t>prev&&h.t<=t){
+    const el=document.createElement('div');el.className='kcn'+(h.head?' hs':'')+(h.kill?' kill':'');el.textContent=h.dmg;$('kcDmg').append(el);
+    const g=KC.ghostT;KC.nums.push({el,t0:now,p:new V3(g.pos.x+rand(-.15,.15),g.pos.y+(g.crouch?1.1:1.5)+(h.head?.25:0),g.pos.z+rand(-.15,.15))});hitmarker(h.kill)}
+  const W=innerWidth,H=innerHeight;
+  for(let i=KC.nums.length-1;i>=0;i--){const n=KC.nums[i],a=now-n.t0;if(a>1){n.el.remove();KC.nums.splice(i,1);continue}
+    const q=n.p.clone();q.y+=a*.45;q.project(cam);const vis=q.z<1;n.el.style.display=vis?'':'none';
+    n.el.style.transform=`translate(${(q.x*.5+.5)*W}px,${(-q.y*.5+.5)*H}px) translate(-50%,-50%) scale(${a<.12?1+(.12-a)*4:1})`;n.el.style.opacity=a<.6?1:1-(a-.6)/.4}}
 function kcSample(t){const H=KC.hist;let i=H.length-1;while(i>0&&H[i].t>t)i--;const a=H[i],b=H[Math.min(H.length-1,i+1)];const k=b.t>a.t?clamp((t-a.t)/(b.t-a.t),0,1):0;return{a,b,k}}
 const kcLerp=(A,B,k)=>A&&B?A.map((v,i)=>i===3?A[3]+((((B[3]-A[3])+Math.PI*3)%(Math.PI*2))-Math.PI)*k:(i<5||i>=9?v+(B[i]-v)*k:(k<.5?v:B[i]))):A||B;
 // the killer's own first-person view: their gun (with camo/attachment) and arms, recoil, bolt/pump, muzzle flash
@@ -1700,30 +1711,37 @@ function kcVM(ks,rm,dt){const w=ks[6]|0;subVM.visible=w===SUBW;KC.kick=Math.max(
   if(w===SUBW){subVM.position.set(.2,-.2,-.46);subVM.rotation.set(-.15,.15,.1);if(KC.vm)KC.vm.g.visible=false;return}
   if(!KC.vm||KC.vm.key!==key){if(KC.vm){vmRoot.remove(KC.vm.g);KC.vm.g.traverse(o=>{if(o.geometry)o.geometry.dispose()})}KC.vm=buildGunFor(wi,cm,aid);KC.vm.key=key}
   const G=KC.vm,se=now-(KC.shotAt||-9),kk=KC.kick;G.g.visible=!scoped;
+  if(G.pivs)for(const pv of G.pivs){pv.rotation.set(0,0,0);pv.position.copy(pv.userData.base)}
   let x=lerp(G.akimbo?0:.17,0,ad),y=lerp(-.17,-G.sightY,ad),z=lerp(G.akimbo?-.4:-.38,G.adsZ||-.3,ad)+kk*.075,rx=kk*.2*(1-.7*ad),ry=0,rz=0;
   if(W.melee){const PS=MELEE_POSE[aid]||MELEE_POSE[''];const kn=se/.4;let A=PS.idle;
     if(kn>=0&&kn<1){const e=t=>t*t*(3-2*t);A=kn<.25?poseLerp(PS.idle,PS.wind,e(kn/.25)):kn<.55?poseLerp(PS.wind,PS.hit,e((kn-.25)/.3)):poseLerp(PS.hit,PS.idle,e((kn-.55)/.45))}
-    G.g.rotation.order='ZYX';G.g.position.set(A[0],A[1],A[2]);G.g.rotation.set(A[3],A[4],A[5]);muzzle.visible=false;return}
+    G.g.rotation.order='ZYX';G.g.position.set(A[0],A[1],A[2]);G.g.rotation.set(A[3],A[4],A[5]);applyInspect(G,G.g,KC.insp,false);muzzle.visible=false;return}
   G.g.rotation.order='XYZ';
   if(W.bolt){const bk=se>.12?(se-.12)/W.bolt:-1;(G.bolts||[]).forEach(b=>boltPose(b,bk));if(bk>=0&&bk<1){const e=Math.sin(bk*Math.PI);rz-=.35*e;rx+=.12*e;x-=.03*e;y-=.02*e}}
   if(G.pump){const pk=(se-.12)/.45;pumpPose(G.pump,pk);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(pk>0&&pk<1){const e=Math.sin(pk*Math.PI);rz+=.12*e;rx+=.05*e}}
   if(G.parts)G.parts.forEach((pt,h)=>{const on=(h===0)===!!KC.hand?kk:0;pt.rotation.x=on*.32;pt.position.z=on*.07});
-  G.g.position.set(x,y,z);G.g.rotation.set(rx,ry,rz);
+  G.g.position.set(x,y,z);G.g.rotation.set(rx,ry,rz);applyInspect(G,G.g,KC.insp,false);
+  if(aid==='laser'&&ad<.5&&!scoped){camBasis();const o=[cam.position.x,cam.position.y,cam.position.z],d=[_f.x,_f.y,_f.z];let lt=rayWorld(o,d,90);
+    if(KC.ghostT&&KC.ghostT.alive){const h=rayTargets(o,d,lt,[KC.ghostT]);if(h)lt=h.t}
+    const hit=cam.position.clone().addScaledVector(_f,lt-.03);laserDot.position.copy(hit);laserDot.scale.setScalar(Math.max(.7,lt*.07));
+    const from=laserFrom(G)||cam.position.clone().addScaledVector(_f,.42);const pa=laserBeam.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,hit.x,hit.y,hit.z);pa.needsUpdate=true;laserDot.visible=laserBeam.visible=true}
   muzzle.visible=se<.05&&!(rm&&rm.sl)&&!scoped;if(muzzle.visible){const mx=G.akimbo?(KC.hand?.19:-.19):0;muzzle.position.set(x+mx,y+.01,z+G.tip);muzzle.rotation.z=Math.random()*3;muzzle.scale.setScalar(rand(.28,.4)*(1-.75*ad));muzzle.material.opacity=.55*(1-.7*ad)}}
 function kcFrame(dt){if(KC.pending&&now>=KC.pending){if(P.alive)KC.pending=0;else kcStart()}
   if(!KC.active)return false;
   const t=KC.from+(now-KC.start);if(t>KC.to||!remotes.has(KC.killer)){kcEnd();return false}
   const{a,b,k}=kcSample(t);
   for(const[peer,r]of remotes){const s=kcLerp(a.rs[peer],b.rs[peer],k);if(!s||!r.mesh)continue;
-    animSoldier(r.mesh,{pos:new V3(s[0],s[1],s[2]),yaw:s[3],pitch:s[4],crouch:!!s[5],w:s[6],alive:!!s[7],speed:s[9],cm:r.cm,at:r.at,ht:r.ht,ck:1,s:0,firedAt:-9},dt)}
-  const m=kcLerp(a.me,b.me,k);const dying=t>=P.deadAt;animSoldier(KC.ghost,{pos:new V3(m[0],m[1],m[2]),yaw:m[3],pitch:dying?0:m[4],crouch:!!m[5],w:m[6],alive:true,speed:dying?0:m[9],cm:camoSel[m[6]]||0,at:attSel[m[6]],ht:hatIdx(),of:outfitIdx(),ck:1,s:0,firedAt:-9},dt);
+    animSoldier(r.mesh,{pos:new V3(s[0],s[1],s[2]),yaw:s[3],pitch:s[4],crouch:!!s[5],w:s[6],alive:!!s[7],speed:s[9],cm:r.cm,at:r.at,ht:r.ht,of:r.of,tm:r.tm,ck:1,s:0,firedAt:-9},dt)}
+  const m=kcLerp(a.me,b.me,k);const dying=t>=P.deadAt;animSoldier(KC.ghost,{pos:new V3(m[0],m[1],m[2]),yaw:m[3],pitch:dying?0:m[4],crouch:!!m[5],w:m[6],alive:true,speed:dying?0:m[9],cm:camoSel[m[6]]||0,at:attIdxOf(m[6]),ht:hatIdx(),of:outfitIdx(),ck:1,s:0,firedAt:-9},dt);
   {const f=dying?Math.min(1,(t-P.deadAt)/.45):0;KC.ghost.g.rotation.x=-f*f*1.45;KC.ghost.g.rotation.z=f*.25}
+  KC.ghostT={pos:new V3(m[0],m[1],m[2]),crouch:!!m[5],alive:!dying,ck:1,ht:hatIdx()};
   const ks=kcLerp(a.rs[KC.killer],b.rs[KC.killer],k);if(!ks){kcEnd();return false}
+  {const ra=a.rs[KC.killer];KC.insp=ra&&ra[12]>0&&ra[11]>=0?inspectPoseAt(INSPK[ra[12]-1],ra[11]+(t-a.t)):null}
   cam.position.set(ks[0],ks[1]+(ks[5]?1.02:1.6),ks[2]);cam.rotation.set(ks[4],ks[3],0);
   const rm=remotes.get(KC.killer);if(rm&&rm.mesh)rm.mesh.g.visible=false;
   if(KC.lastF!=null&&ks[8]>KC.lastF){const dir=new V3(-Math.sin(ks[3])*Math.cos(ks[4]),Math.sin(ks[4]),-Math.cos(ks[3])*Math.cos(ks[4]));const o=cam.position.clone().addScaledVector(dir,.6).add(new V3(0,-.12,0));
     if(ks[6]!==4){const wt=rayWorld([o.x,o.y,o.z],[dir.x,dir.y,dir.z],140);tracer(o,o.clone().addScaledVector(dir,wt),0xffd090);shotSound(ks[6]<WEAPONS.length?ks[6]|0:0,0)}else sNoise(2400,.12,.2);KC.shotAt=now;KC.kick=1;KC.hand=!KC.hand}
-  KC.lastF=ks[8];kcVM(ks,rm,dt);
+  KC.lastF=ks[8];kcVM(ks,rm,dt);kcDamage(t);
   $('kcBar').style.width=clamp((t-KC.from)/(KC.to-KC.from),0,1)*100+'%';
   return true}
 
@@ -1767,7 +1785,7 @@ function laserFrom(G){if(G&&G.laserTip===undefined){G.laserTip=null;G.g.traverse
   lt.localToWorld(_lzW.set(0,-.003,0));_lzW.project(vmCam);if(_lzW.z>1)return null;
   _lzQ.set(_lzW.x,_lzW.y,.5).unproject(cam).sub(cam.position).normalize();const k=.35/Math.max(.2,_lzQ.dot(_f));
   return cam.position.clone().addScaledVector(_lzQ,k)}
-function updateLaser(w,G){const on=w.laser&&P.alive&&!P.holdSub&&P.adsP<.5&&!(typeof KC!=='undefined'&&KC.active)&&!matchOver;laserDot.visible=laserBeam.visible=on;if(!on)return;
+function updateLaser(w,G){const on=!!w.laser&&P.alive&&!P.holdSub&&P.adsP<.5&&!(typeof KC!=='undefined'&&KC.active)&&!matchOver;laserDot.visible=laserBeam.visible=on;if(!on)return;
   camBasis();const o=[cam.position.x,cam.position.y,cam.position.z],d=[_f.x,_f.y,_f.z];let t=rayWorld(o,d,90);const ht=rayTargets(o,d,t,targetsForMe());if(ht)t=ht.t;
   const hit=cam.position.clone().addScaledVector(_f,t-.03);laserDot.position.copy(hit);laserDot.scale.setScalar(Math.max(.7,t*.07));
   const from=laserFrom(G)||cam.position.clone().addScaledVector(_f,.42).addScaledVector(_r,.13).addScaledVector(_u,-.13);const pa=laserBeam.geometry.attributes.position;pa.setXYZ(0,from.x,from.y,from.z);pa.setXYZ(1,hit.x,hit.y,hit.z);pa.needsUpdate=true}const vmKickH=[0,0];
@@ -2101,8 +2119,19 @@ const INSPECT={
 const inspKind=w=>w.melee?'knife':w.id==='revolver'?'revolver':w.id==='shotgun'?'shotgun':w.id==='sniper'?'sniper':w.id==='dbl'?'dbl':w.id==='fifty'?'fifty':'gun';
 function startInspect(){if(!P.alive||P.holdSub||P.rkHold||P.reloadT>0||P.adsP>.1||now<P.switchT||P.spect||P.inspectAt>0&&now-P.inspectAt<INSPECT[P.inspectKind].T)return;
   P.inspectKind=inspKind(EFF[P.wi]);P.inspectAt=now;sNoise(1400,.06,.12,'bandpass',2)}
+const INSPK=['gun','shotgun','sniper','dbl','fifty','revolver','knife'];
 function inspectPose(){if(!(P.inspectAt>0))return null;const I=INSPECT[P.inspectKind];const t=now-P.inspectAt;
   if(t>=I.T||!P.alive||mouseDown||rmb||P.reloadT>0||P.sprint||now<P.switchT||P.holdSub||P.rkHold){P.inspectAt=-9;return null}
+  return inspectPoseAt(P.inspectKind,t)}
+// apply an inspect pose to a viewmodel (own view, or the killer's view in the killcam)
+function applyInspect(G,g,ip,snd){if(!ip)return;const o=ip.o,t=ip.t,I=ip.I;
+    if(G.akimbo){g.position.x+=o[1]*.3;g.position.y+=o[2];g.position.z+=o[3];g.rotation.y+=o[5]*.25;g.rotation.z+=o[6]*.25}
+    else{g.position.x+=o[1];g.position.y+=o[2];g.position.z+=o[3];g.rotation.x+=o[4];g.rotation.y+=o[5];g.rotation.z+=o[6]}
+    if(G.pivs)for(const pv of G.pivs){pv.rotation.x=ip.pv.rx;pv.rotation.z=ip.pv.rz;pv.position.y+=ip.pv.y;pv.position.z+=ip.pv.z}
+    if(I.pump&&G.pump){const k=(t-I.pump[0])/(I.pump[1]-I.pump[0]);pumpPose(G.pump,k*.5);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(snd&&Math.abs(t-I.pump[0]-.05)<.02)sNoise(1600,.06,.18,'bandpass',2)}
+    if(I.bolt&&G.bolts){const k=(t-I.bolt[0])/1.0;G.bolts.forEach(b=>boltPose(b,k));if(snd&&Math.abs(t-I.bolt[0]-.05)<.02)sNoise(2600,.05,.16,'bandpass',3)}
+    if(I.cyl){if(t>I.cyl[0]&&t<I.cyl[1]){if(G.cyl)G.cyl.rotation.z+=.6;if(G.cyls)G.cyls.forEach(c=>{if(c)c.rotation.z+=.6})}}}
+function inspectPoseAt(kind,t){const I=INSPECT[kind];if(!I||t<0||t>=I.T)return null;
   const K=I.k;let i=0;while(i<K.length-2&&t>K[i+1][0])i++;const a=K[i],b=K[i+1],u=clamp((t-a[0])/(b[0]-a[0]),0,1),e=u*u*(3-2*u);
   const o=a.map((v,j)=>v+(b[j]-v)*e);o[0]=t;
   const ph=r=>{const q=clamp((t-r[0])/(r[1]-r[0]),0,1);return{q,e:q*q*(3-2*q)}};
@@ -2219,7 +2248,7 @@ let shake=0;
 
 /* ---------------- damage to me ---------------- */
 function hurtMe(dmg,att,wi,head,wb,ns,am){if(!P.alive||matchOver||now-P.spawnT<.6||inBooth()||P.spect)return;
-  if(teamOn()&&wi!==BOMB&&wi!==NUKE&&att&&att.peer&&myTeam>=0&&teamOfPeer(att.peer)===myTeam&&att.peer!==findMyPeer())return;P.hp-=dmg;P.lastHurt=now;shake=Math.max(shake,.12);sTone(180,.12,.25,'sawtooth',90);
+  if(teamOn()&&wi!==BOMB&&wi!==NUKE&&att&&att.peer&&myTeam>=0&&teamOfPeer(att.peer)===myTeam&&att.peer!==findMyPeer())return;hurtLog.push({t:now,dmg:Math.max(1,Math.round(Math.min(dmg,P.hp))),head:!!head,kill:dmg>=P.hp,peer:att&&att.peer});while(hurtLog.length&&hurtLog[0].t<now-8)hurtLog.shift();P.hp-=dmg;P.lastHurt=now;shake=Math.max(shake,.12);sTone(180,.12,.25,'sawtooth',90);
   if(P.hp<=0)die(att,wi,head,wb,ns);else if(am)applyAmmoFx(am,att,wi)}
 function die(att,wi,head,wb,ns){P.alive=false;laserDot.visible=laserBeam.visible=false;P.hp=0;P.deaths++;P.streak=0;P.deadAt=now;P.killer=att;P.reloadT=0;mouseDown=false;
   const self=!att||att.me;
@@ -2251,7 +2280,7 @@ function safeEmit(topic,data){if(!room)return;room.emit(topic,data).catch(e=>{if
 function queueHit(peer,dmg,wi,head,wb,ns,am){if(!peer)return;const h=pendingHits.get(peer)||{d:0,w:wi,h:0,b:0,n:0,a:0};if(am===2||am===3)h.a=am;h.d+=dmg;h.w=wi;if(head)h.h=1;if(wb)h.b=1;h.n=ns&&isGun(wi)?1:0;pendingHits.set(peer,h)}
 function flushHits(){if(!pendingHits.size||now-lastFlush<.09)return;lastFlush=now;for(const[peer,h]of pendingHits)safeEmit('hit',{t:peer,d:Math.round(h.d),w:h.w,h:h.h,b:h.b,n:h.n,a:h.a});pendingHits.clear()}
 function sendPresence(force){if(!room||(!force&&now-lastPres<.05))return;lastPres=now;const r2=v=>Math.round(v*100)/100;
-  room.presence({n:myName,c:myColor,p:[r2(P.pos.x),r2(P.pos.y),r2(P.pos.z)],y:Math.round(P.yaw*1000)/1000,x:Math.round(P.pitch*1000)/1000,cr:P.crouch?1:0,w:P.holdSub?SUBW:P.wi,cm:camoSel[P.wi],at:attIdxOf(P.wi),gl:P.ggLvl|0,of:outfitIdx(),ht:hatIdx(),bo:inBooth()?1:0,tm:myTeam,sp:P.spect?1:0,ck:Math.round(P.campK*100)/100,fx:now<P.burnUntil?1:now<P.slowUntil?2:0,vac:myVacState(),byw:Math.round(P.boothYaw*100)/100,sl:EFF[P.wi].sil?1:0,ad:Math.round(P.adsP*10)/10,hb:Math.floor(now*2)%1000,a:P.alive?1:0,k:P.kills,d:P.deaths,s:P.streak,f:P.shots,sp:Math.round(P.speed*10)/10}).catch(()=>{})}
+  room.presence({n:myName,c:myColor,p:[r2(P.pos.x),r2(P.pos.y),r2(P.pos.z)],y:Math.round(P.yaw*1000)/1000,x:Math.round(P.pitch*1000)/1000,cr:P.crouch?1:0,w:P.holdSub?SUBW:P.wi,cm:camoSel[P.wi],at:attIdxOf(P.wi),gl:P.ggLvl|0,of:outfitIdx(),ht:hatIdx(),bo:inBooth()?1:0,tm:myTeam,sp:P.spect?1:0,ck:Math.round(P.campK*100)/100,fx:now<P.burnUntil?1:now<P.slowUntil?2:0,vac:myVacState(),byw:Math.round(P.boothYaw*100)/100,sl:EFF[P.wi].sil?1:0,ad:Math.round(P.adsP*10)/10,...(P.inspectAt>0&&P.alive&&now-P.inspectAt<INSPECT[P.inspectKind].T?{ik:INSPK.indexOf(P.inspectKind)+1,ie:Math.round((now-P.inspectAt)*100)/100}:{ik:0}),hb:Math.floor(now*2)%1000,a:P.alive?1:0,k:P.kills,d:P.deaths,s:P.streak,f:P.shots,sp:Math.round(P.speed*10)/10}).catch(()=>{})}
 function findMyPeer(){if(myPeer||!lobby)return myPeer;const me=lobby.peers().find(p=>p.sameTab);if(me)myPeer=me.peer;return myPeer}
 /* Self-hosted networking: when KontorLAN is served by its own server (no claude.ai viewer around it),
    the same room API is provided over a WebSocket to that server. */
@@ -2348,7 +2377,7 @@ function updateRemotes(dt){if(!room)return;const seen=new Set();
     let r=remotes.get(p.peer);
     if(!r||r.name!==name||r.ci!==ci){const keep=r;if(r)disposeSoldier(r.mesh);r={peer:p.peer,name,ci,mesh:makeSoldier(ci,name),pos:keep?keep.pos:new V3(),tgt:new V3(),yaw:0,pitch:0,crouch:false,alive:false,k:0,d:0,s:0,f:null,firedAt:-9,w:0,speed:0,fresh:!keep,seen:keep?keep.seen:now};remotes.set(p.peer,r)}
     r.tgt.set(clamp(num(pr.p[0]),-60,60),clamp(num(pr.p[1]),0,40),clamp(num(pr.p[2]),-60,60));
-    r.yaw=num(pr.y);r.pitch=num(pr.x);r.crouch=pr.cr===1;r.w=num(pr.w)|0;if(r.w!==SUBW&&!(r.w>=0&&r.w<WEAPONS.length))r.w=0;r.cm=clamp(num(pr.cm)|0,0,CAMOS.length-1);r.at=r.w<WEAPONS.length?clamp(num(pr.at,-1)|0,-1,ATT[WEAPONS[r.w].id].length-1):-1;r.sl=pr.sl===1;r.ad=clamp(num(pr.ad,0),0,1);r.ht=clamp(num(pr.ht,-1)|0,-1,HATS.length-1);r.bo=pr.bo===1;r.tm=num(pr.tm,-1)|0;r.sp=pr.sp===1;r.ck=clamp(num(pr.ck,1),1,4);r.fx=pr.fx===1?1:pr.fx===2?2:0;syncRemoteVac(r,pr.vac);r.byw=num(pr.byw);r.boothOn=r.bo&&r.alive;r.k=num(pr.k)|0;r.of=clamp(num(pr.of,-1)|0,-1,OUTFITS.length-1);r.gl=clamp(num(pr.gl,0)|0,0,20);r.d=num(pr.d)|0;r.s=num(pr.s)|0;r.speed=num(pr.sp);
+    r.yaw=num(pr.y);r.pitch=num(pr.x);r.crouch=pr.cr===1;r.w=num(pr.w)|0;if(r.w!==SUBW&&!(r.w>=0&&r.w<WEAPONS.length))r.w=0;r.cm=clamp(num(pr.cm)|0,0,CAMOS.length-1);r.at=r.w<WEAPONS.length?clamp(num(pr.at,-1)|0,-1,ATT[WEAPONS[r.w].id].length-1):-1;r.sl=pr.sl===1;r.ad=clamp(num(pr.ad,0),0,1);{const ik=clamp(num(pr.ik,0)|0,0,INSPK.length);if(ik&&(r.ik!==ik||!(r.inT0>0)))r.inT0=now-clamp(num(pr.ie,0),0,5);r.ik=ik}r.ht=clamp(num(pr.ht,-1)|0,-1,HATS.length-1);r.bo=pr.bo===1;r.tm=num(pr.tm,-1)|0;r.sp=pr.sp===1;r.ck=clamp(num(pr.ck,1),1,4);r.fx=pr.fx===1?1:pr.fx===2?2:0;syncRemoteVac(r,pr.vac);r.byw=num(pr.byw);r.boothOn=r.bo&&r.alive;r.k=num(pr.k)|0;r.of=clamp(num(pr.of,-1)|0,-1,OUTFITS.length-1);r.gl=clamp(num(pr.gl,0)|0,0,20);r.d=num(pr.d)|0;r.s=num(pr.s)|0;r.speed=num(pr.sp);
     // Ghost players: a tab that was closed, crashed or left in the background keeps its last presence for a
     // while. It stands still and can't die (hits are applied by the victim's own game). Hide it once it stops
     // updating: newer clients send a heartbeat, older ones are judged by their presence not changing at all.
@@ -2588,13 +2617,7 @@ function updateView(dt){const w=EFF[P.wi];
     g.position.set(A[0]+sb,A[1]-sp*.04+Math.abs(Math.cos(walkPh))*.012*bob-(now<P.switchT?(P.switchT-now)/.35*.3:0),A[2]);
     g.rotation.set(A[3]-sp*.25,A[4],A[5])}else g.rotation.order='XYZ';
   if(G.pivs)for(const pv of G.pivs){pv.rotation.set(0,0,0);pv.position.copy(pv.userData.base)}
-  {const ip=inspectPose();if(ip){const o=ip.o,t=ip.t,I=ip.I;
-    if(G.akimbo){g.position.x+=o[1]*.3;g.position.y+=o[2];g.position.z+=o[3];g.rotation.y+=o[5]*.25;g.rotation.z+=o[6]*.25}
-    else{g.position.x+=o[1];g.position.y+=o[2];g.position.z+=o[3];g.rotation.x+=o[4];g.rotation.y+=o[5];g.rotation.z+=o[6]}
-    if(G.pivs)for(const pv of G.pivs){pv.rotation.x=ip.pv.rx;pv.rotation.z=ip.pv.rz;pv.position.y+=ip.pv.y;pv.position.z+=ip.pv.z}
-    if(I.pump&&G.pump){const k=(t-I.pump[0])/(I.pump[1]-I.pump[0]);pumpPose(G.pump,k*.5);if(G.lhand)G.lhand.position.z=G.pump.position.z;if(Math.abs(t-I.pump[0]-.05)<.02)sNoise(1600,.06,.18,'bandpass',2)}
-    if(I.bolt&&G.bolts){const k=(t-I.bolt[0])/1.0;G.bolts.forEach(b=>boltPose(b,k));if(Math.abs(t-I.bolt[0]-.05)<.02)sNoise(2600,.05,.16,'bandpass',3)}
-    if(I.cyl){if(t>I.cyl[0]&&t<I.cyl[1]){if(G.cyl)G.cyl.rotation.z+=.6;if(G.cyls)G.cyls.forEach(c=>{if(c)c.rotation.z+=.6})}}}}
+  applyInspect(G,g,inspectPose(),true);
   if(subVM.visible){const ta=now-P.subAt;const k=ta>0&&ta<.26?Math.sin(ta/.26*Math.PI):0;const raise=now<P.switchT?(P.switchT-now)/.3:0;subVM.position.set(.2-k*.1,-.2-raise*.2+k*.08+Math.abs(Math.cos(walkPh))*.01*bob,-.46-k*.25);subVM.rotation.set(-.15-k*.6,.15,.1)}
   if(myBooth||inBooth()){if(!myBooth)myBooth=makeBooth();animBooth(myBooth,inBooth()&&P.alive,P.pos,P.boothYaw,dt)}
   updateLaser(w,G);
